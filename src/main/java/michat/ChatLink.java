@@ -2,6 +2,7 @@ package michat;
 
 import arc.Core;
 import arc.scene.ui.layout.Table;
+import arc.util.Log;
 import java.io.BufferedReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
@@ -23,7 +24,7 @@ final class ChatLink{
                 String line;
                 while((line = reader.readLine()) != null){
                     String text = line;
-                    Core.app.post(() -> Core.app.log(text));
+                    Core.app.post(() -> Log.info("MiChat: @", text));
                 }
             }catch(Exception e){
                 Log.err("MiChat connection failed", e);
