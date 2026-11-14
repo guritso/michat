@@ -23,6 +23,12 @@ jobs:
           mkdir -p libs
           curl -L --fail https://github.com/Anuken/Mindustry/releases/download/v160.7/server-release.jar -o libs/Mindustry.jar
       - run: gradle build
+      - name: Build dex for Android
+        run: |
+          D8=$(ls $ANDROID_HOME/build-tools/*/d8 | sort -V | tail -1)
+          mkdir -p build/dex
+          "$D8" --release --min-api 21 --output build/dex $(find build/classes/java/main -name '*.class')
+          (cd build/dex && zip ../libs/michat.jar classes.dex)
       - name: Package mod
         run: |
           mkdir -p release
