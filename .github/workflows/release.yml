@@ -21,7 +21,7 @@ jobs:
       - name: Download Mindustry API
         run: |
           mkdir -p libs
-          curl -L --fail https://github.com/Anuken/Mindustry/releases/download/v146/server-release.jar -o libs/Mindustry.jar
+          curl -L --fail https://github.com/Anuken/Mindustry/releases/download/v160.7/server-release.jar -o libs/Mindustry.jar
       - run: gradle build
       - name: Package mod
         run: |
