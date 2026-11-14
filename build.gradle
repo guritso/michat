@@ -15,7 +15,7 @@ dependencies {
 
 sourceSets.main.resources.srcDir '.'
 processResources {
-    include 'mod.json'
+    include 'mod.json', 'icon.png'
 }
 
 jar {
