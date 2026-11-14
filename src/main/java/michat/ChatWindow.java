@@ -46,12 +46,15 @@ public class ChatWindow implements ChatMesh.Listener{
         Table box = new Table(Styles.black6);
         box.margin(10f);
 
-        float boxH = Math.min(430f, Core.scene.getHeight() - 24f);
+        boolean mob = Core.app.isMobile();
+        float boxH = Math.min(mob ? 580f : 430f, Core.scene.getHeight() - 20f);
         float listH = Math.min(320f, boxH - 116f);
+        float closeSize = mob ? 64f : 40f;
 
         Table head = new Table();
         head.add("MiChat").color(Pal.accent).growX().left();
-        head.button(Icon.cancelSmall, Styles.cleari, () -> toggle());
+        head.button(Icon.cancel, Styles.cleari, () -> toggle()).size(closeSize).get()
+            .resizeImage(closeSize * 0.6f);
         box.add(head).growX().row();
 
         list = new Table();
@@ -82,6 +85,9 @@ public class ChatWindow implements ChatMesh.Listener{
     }
 
     private float width(){
+        if(Core.app.isMobile()){
+            return Math.max(280f, Core.scene.getWidth() - 16f);
+        }
         return Math.min(424f, Core.scene.getWidth() - 24f);
     }
 
