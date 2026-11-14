@@ -1,0 +1,7 @@
+name: MiChat
+displayName: MiChat
+author: guritso
+main: michat.MiChat
+version: 1.0.0
+description: ""
+minGameVersion: 146
