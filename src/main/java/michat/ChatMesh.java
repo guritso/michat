@@ -202,6 +202,10 @@ public class ChatMesh{
         boolean replaced = false;
         synchronized(lock){
             Peer existing = findPeer(p.ip);
+            if(existing != null && (existing.socket.isClosed() || !existing.socket.isConnected())){
+                peers.remove(existing);
+                existing = null;
+            }
             boolean wantOut = localIp.isEmpty() ? false : localIp.compareTo(p.ip) < 0;
             if(existing != null){
                 if(existing.outgoing == wantOut){
@@ -247,6 +251,9 @@ public class ChatMesh{
                 return;
             }
             String name = sanitize(line.substring(HELLO.length() + 1), 24);
+            // reply with our own greeting so the probing side can complete its handshake
+            PrintWriter out = new PrintWriter(new OutputStreamWriter(s.getOutputStream()), true);
+            out.println(HELLO + " " + myName());
             String ip = s.getInetAddress().getHostAddress();
             adopt(new Probe(ip, name, s, false));
         }catch(Exception e){

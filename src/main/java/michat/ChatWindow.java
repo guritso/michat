@@ -46,6 +46,9 @@ public class ChatWindow implements ChatMesh.Listener{
         Table box = new Table(Styles.black6);
         box.margin(10f);
 
+        float boxH = Math.min(430f, Core.scene.getHeight() - 24f);
+        float listH = Math.min(320f, boxH - 116f);
+
         Table head = new Table();
         head.add("MiChat").color(Pal.accent).growX().left();
         head.button(Icon.cancelSmall, Styles.cleari, () -> toggle());
@@ -55,10 +58,7 @@ public class ChatWindow implements ChatMesh.Listener{
         list.margin(2f, 6f, 2f, 6f);
         scroll = new ScrollPane(list, Styles.smallPane);
         scroll.setScrollingDisabled(true, false);
-        box.row().add(scroll).width(width() - 20f).maxHeight(320f).row();
-
-        statusRow = new Table();
-        box.row().add(statusRow).growX().left().padTop(4f).row();
+        box.row().add(scroll).width(width() - 20f).maxHeight(listH).row();
 
         Table input = new Table();
         field = new TextField("", Styles.defaultField);
@@ -69,9 +69,12 @@ public class ChatWindow implements ChatMesh.Listener{
         });
         input.add(field).growX();
         input.button("Send", this::send).padLeft(6f);
-        box.row().add(input).growX().padTop(8f);
+        box.row().add(input).growX().padTop(8f).row();
 
-        root.add(box).width(width()).maxHeight(430f);
+        statusRow = new Table();
+        box.row().add(statusRow).growX().left().padTop(4f);
+
+        root.add(box).width(width()).maxHeight(boxH);
         Core.scene.add(root);
 
         rebuildStatus();
@@ -135,8 +138,9 @@ public class ChatWindow implements ChatMesh.Listener{
     }
 
     private static String nameColor(String name){
-        int h = name.hashCode();
-        Color c = Color.HSVtoRGB(Math.abs(h) % 360, 0.55f, 0.95f);
+        int h = Math.abs(name.hashCode());
+        // bright pastel-like color: fully saturated hue, lightened toward white for readability
+        Color c = new Color().fromHsv(h % 360f, 0.6f, 1f).lerp(Color.white, 0.25f);
         return "#" + String.format("%02x%02x%02x",
             (int)(c.r * 255f), (int)(c.g * 255f), (int)(c.b * 255f));
     }
