@@ -55,7 +55,7 @@ public class ChatWindow implements ChatMesh.Listener{
         list.margin(2f, 6f, 2f, 6f);
         scroll = new ScrollPane(list, Styles.smallPane);
         scroll.setScrollingDisabled(true, false);
-        box.row().add(scroll).width(400f).maxHeight(320f).row();
+        box.row().add(scroll).width(width() - 20f).maxHeight(320f).row();
 
         statusRow = new Table();
         box.row().add(statusRow).growX().left().padTop(4f).row();
@@ -71,11 +71,15 @@ public class ChatWindow implements ChatMesh.Listener{
         input.button("Send", this::send).padLeft(6f);
         box.row().add(input).growX().padTop(8f);
 
-        root.add(box).width(424f).maxHeight(430f);
+        root.add(box).width(width()).maxHeight(430f);
         Core.scene.add(root);
 
         rebuildStatus();
         rebuildMessages();
+    }
+
+    private float width(){
+        return Math.min(424f, Core.scene.getWidth() - 24f);
     }
 
     private void send(){
@@ -109,7 +113,7 @@ public class ChatWindow implements ChatMesh.Listener{
                     "[" + nameColor(m.name) + "]" + esc(m.name) + "[]: [white]" + esc(m.text)
                 );
                 label.setWrap(true);
-                list.add(label).left().growX().width(384f).pad(1f, 6f, 1f, 6f).row();
+                list.add(label).left().growX().width(width() - 44f).pad(1f, 6f, 1f, 6f).row();
             }
         }
         toBottom();
