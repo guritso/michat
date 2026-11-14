@@ -7,9 +7,12 @@ import arc.scene.event.*;
 import arc.scene.ui.*;
 import arc.scene.ui.layout.*;
 import arc.util.*;
+import mindustry.Vars;
 import mindustry.gen.Icon;
 import mindustry.graphics.Pal;
 import mindustry.ui.Styles;
+
+import java.util.List;
 
 /** Minimal, native-looking chat window. */
 public class ChatWindow implements ChatMesh.Listener{
@@ -20,6 +23,7 @@ public class ChatWindow implements ChatMesh.Listener{
     private Table statusRow;
     private ScrollPane scroll;
     private TextField field;
+    private float winWidth;
     private boolean shown;
 
     public ChatWindow(ChatMesh mesh){
@@ -41,14 +45,19 @@ public class ChatWindow implements ChatMesh.Listener{
         root = new Table();
         root.setFillParent(true);
         root.touchable = Touchable.childrenOnly;
-        root.visible(() -> shown);
+        // MiChat is only used from the menu; during matches the native chat takes over
+        root.visible(() -> shown && !Vars.state.isGame());
 
         Table box = new Table(Styles.black6);
         box.margin(10f);
 
         boolean mob = Core.app.isMobile();
-        float boxH = Math.min(mob ? 580f : 430f, Core.scene.getHeight() - 20f);
-        float listH = Math.min(320f, boxH - 116f);
+        float sceneW = Math.max(Core.scene.getWidth(), 300f);
+        float sceneH = Math.max(Core.scene.getHeight(), 400f);
+        float w = Math.min(mob ? 500f : 424f, sceneW - 24f);
+        winWidth = w;
+        float boxH = Math.min(mob ? 560f : 430f, sceneH - 24f);
+        float listH = Math.max(200f, Math.min(320f, boxH - 116f));
         float closeSize = mob ? 64f : 40f;
 
         Table head = new Table();
@@ -61,7 +70,7 @@ public class ChatWindow implements ChatMesh.Listener{
         list.margin(2f, 6f, 2f, 6f);
         scroll = new ScrollPane(list, Styles.smallPane);
         scroll.setScrollingDisabled(true, false);
-        box.row().add(scroll).width(width() - 20f).maxHeight(listH).row();
+        box.row().add(scroll).width(w - 20f).maxHeight(listH).row();
 
         Table input = new Table();
         field = new TextField("", Styles.defaultField);
@@ -77,7 +86,7 @@ public class ChatWindow implements ChatMesh.Listener{
         statusRow = new Table();
         box.row().add(statusRow).growX().left().padTop(4f);
 
-        root.add(box).width(width()).maxHeight(boxH);
+        root.add(box).width(w).maxHeight(boxH);
         Core.scene.add(root);
 
         rebuildStatus();
@@ -85,10 +94,8 @@ public class ChatWindow implements ChatMesh.Listener{
     }
 
     private float width(){
-        if(Core.app.isMobile()){
-            return Math.max(280f, Core.scene.getWidth() - 16f);
-        }
-        return Math.min(424f, Core.scene.getWidth() - 24f);
+        float base = Core.app.isMobile() ? 500f : 424f;
+        return Math.min(base, Math.max(300f, Core.scene.getWidth()) - 24f);
     }
 
     private void send(){
@@ -103,7 +110,19 @@ public class ChatWindow implements ChatMesh.Listener{
 
     @Override
     public void onMessage(){
-        Core.app.post(this::rebuildMessages);
+        Core.app.post(() -> {
+            List<ChatMesh.Message> h = mesh.history();
+            // while playing, mesh messages are mirrored into the native chat
+            if(!h.isEmpty() && Vars.state.isGame() && Vars.ui != null){
+                ChatMesh.Message m = h.get(h.size() - 1);
+                if(m.system){
+                    Vars.ui.chatfrag.addMessage("[gray]" + esc(m.name) + " " + esc(m.text));
+                }else{
+                    Vars.ui.chatfrag.addMessage("[" + nameColor(m.name) + "]" + esc(m.name) + "[]: " + esc(m.text));
+                }
+            }
+            rebuildMessages();
+        });
     }
 
     @Override
@@ -122,7 +141,7 @@ public class ChatWindow implements ChatMesh.Listener{
                     "[" + nameColor(m.name) + "]" + esc(m.name) + "[]: [white]" + esc(m.text)
                 );
                 label.setWrap(true);
-                list.add(label).left().growX().width(width() - 44f).pad(1f, 6f, 1f, 6f).row();
+                list.add(label).left().growX().width(winWidth - 44f).pad(1f, 6f, 1f, 6f).row();
             }
         }
         toBottom();
