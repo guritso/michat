@@ -13,6 +13,11 @@ dependencies {
     compileOnly files('libs/Mindustry.jar')
 }
 
+sourceSets.main.resources.srcDir '.'
+processResources {
+    include 'mod.json'
+}
+
 jar {
     archiveFileName = 'michat.jar'
 }

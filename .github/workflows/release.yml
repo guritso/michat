@@ -26,7 +26,7 @@ jobs:
       - name: Package mod
         run: |
           mkdir -p release
-          cp mod.hjson release/
+          cp mod.json release/
           cp build/libs/michat.jar release/
           cp build/libs/michat.jar michat.jar
           cd release

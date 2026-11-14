@@ -1,0 +1,9 @@
+{
+  "name": "michat",
+  "displayName": "MiChat",
+  "author": "guritso",
+  "description": "",
+  "version": "1.0.6",
+  "minGameVersion": 146,
+  "main": "michat.MiChat"
+}
