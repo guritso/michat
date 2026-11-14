@@ -4,9 +4,9 @@ plugins {
 
 version = '1.0.0'
 
-java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+tasks.withType(JavaCompile).configureEach {
+    // Mindustry on Android only loads mod classes targeting Java 8
+    options.release = 8
 }
 
 dependencies {
