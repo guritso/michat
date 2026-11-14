@@ -2,12 +2,7 @@ package michat;
 
 import arc.Core;
 import arc.Events;
-import arc.files.Fi;
-import arc.graphics.Texture;
-import arc.graphics.g2d.TextureRegion;
 import arc.scene.event.Touchable;
-import arc.scene.style.Drawable;
-import arc.scene.style.TextureRegionDrawable;
 import arc.scene.ui.layout.Table;
 import mindustry.Vars;
 import mindustry.game.EventType.ClientLoadEvent;
@@ -26,8 +21,7 @@ public class MiChat extends Mod{
             mesh.start();
             window = new ChatWindow(mesh);
 
-            Drawable icon = loadIcon();
-            Vars.ui.menufrag.addButton("MiChat", icon, () -> window.toggle());
+            Vars.ui.menufrag.addButton("MiChat", Icon.chat, () -> window.toggle());
             // the menu only rebuilds its button grid on resize events
             Events.fire(new ResizeEvent());
 
@@ -35,19 +29,8 @@ public class MiChat extends Mod{
             corner.touchable = Touchable.enabled;
             corner.visible(() -> Vars.state.isGame());
             corner.bottom().left();
-            corner.button(icon, () -> window.toggle()).pad(10f).size(54f);
+            corner.button(Icon.chatSmall, () -> window.toggle()).pad(10f).size(54f);
             Core.scene.add(corner);
         });
-    }
-
-    private static Drawable loadIcon(){
-        try{
-            Fi file = Vars.mods.getMod(MiChat.class).root.child("icon.png");
-            if(file.exists()){
-                return new TextureRegionDrawable(new TextureRegion(new Texture(file)));
-            }
-        }catch(Exception ignored){
-        }
-        return Icon.chat;
     }
 }
