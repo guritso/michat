@@ -44,6 +44,8 @@ public class ChatMesh{
             this.name = name;
             this.outgoing = outgoing;
             this.socket = socket;
+            // probe sockets carry a short read timeout; peer connections must wait indefinitely
+            socket.setSoTimeout(0);
             this.in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             this.out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()), true);
         }

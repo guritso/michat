@@ -106,7 +106,7 @@ public class ChatWindow implements ChatMesh.Listener{
         list.clear();
         for(ChatMesh.Message m : mesh.history()){
             if(m.system){
-                list.add("[lightishGray]" + esc(m.name) + " " + esc(m.text))
+                list.add("[#a2a2a2]" + esc(m.name) + " " + esc(m.text))
                     .left().growX().pad(1f, 6f, 1f, 6f).row();
             }else{
                 Label label = new Label(
@@ -122,10 +122,10 @@ public class ChatWindow implements ChatMesh.Listener{
     private void rebuildStatus(){
         statusRow.clear();
         if(!mesh.onVpn()){
-            statusRow.add("[scarlet]\u25cf[] [lightishGray]no VPN detected").left();
+            statusRow.add("[#e55454]\u25cf[] [#a2a2a2]no VPN detected").left();
         }else{
             String peers = mesh.peerSummary();
-            statusRow.add("[green]\u25cf[] [lightishGray]" + mesh.localIp() +
+            statusRow.add("[#54d860]\u25cf[] [#a2a2a2]" + mesh.localIp() +
                 (peers.isEmpty() ? " \u00b7 searching" : " \u00b7 " + peers)).left();
         }
     }
@@ -137,7 +137,7 @@ public class ChatWindow implements ChatMesh.Listener{
     private static String nameColor(String name){
         int h = name.hashCode();
         Color c = Color.HSVtoRGB(Math.abs(h) % 360, 0.55f, 0.95f);
-        return String.format("%02x%02x%02x",
+        return "#" + String.format("%02x%02x%02x",
             (int)(c.r * 255f), (int)(c.g * 255f), (int)(c.b * 255f));
     }
 }
