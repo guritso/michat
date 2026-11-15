@@ -11,16 +11,14 @@ import java.util.*;
 import java.util.concurrent.*;
 
 /**
- * Peer-to-peer chat over an existing VPN (WireGuard) interface.
- * No configuration: the VPN interface and its subnet are detected automatically,
- * and every machine on that subnet running Mindustry with this mod is found by
- * probing the chat port. Messages are flooded between peers (deduplicated by id,
- * with a small hop limit), so no central relay is needed.
+ * Peer-to-peer chat over VPN or local LAN interfaces.
+ * Messages are flooded between peers (deduplicated by id, with a small hop limit),
+ * so no central relay is needed.
  */
 public class ChatMesh{
     public static final int PORT = 26319;
     /** mod version, synced with mod.json; broadcast in the HELLO handshake */
-    public static final String VERSION = "1.8.0";
+    public static final String VERSION = "1.8.1";
 
     private static final String HELLO = "MICHAT1";
     private static final String PREFIX = "MICHAT_MSG|";
@@ -257,10 +255,16 @@ public class ChatMesh{
             long network = ip & mask;
             long broadcast = network | (~mask & 0xffffffffL);
 
-            List<Future<Probe>> futures = new ArrayList<>();
+            Set<String> targets = new LinkedHashSet<>();
             for(long host = network + 1; host < broadcast; host++){
-                if(host == ip) continue;
-                String target = longToIpv4(host);
+                if(host != ip) targets.add(longToIpv4(host));
+            }
+            // Tailscale assigns addresses across 100.64.0.0/10, which is too large to scan.
+            // Reuse active Mindustry connection endpoints as focused MiChat discovery targets.
+            if(address.vpn) targets.addAll(activeTailscalePeers());
+
+            List<Future<Probe>> futures = new ArrayList<>();
+            for(String target : targets){
                 futures.add(scanPool.submit(() -> probe(target)));
             }
             for(Future<Probe> f : futures){
@@ -667,6 +671,29 @@ public class ChatMesh{
         int first = b[0] & 0xff, second = b[1] & 0xff;
         return first == 10 || (first == 172 && second >= 16 && second <= 31) ||
             (first == 192 && second == 168);
+    }
+
+    private static Set<String> activeTailscalePeers(){
+        Set<String> peers = new LinkedHashSet<>();
+        try{
+            for(mindustry.net.NetConnection connection : Vars.net.getConnections()){
+                if(connection == null || !connection.isConnected() || connection.address == null) continue;
+                String host = connection.address;
+                int colon = host.lastIndexOf(':');
+                if(colon > 0 && host.indexOf(':') == colon) host = host.substring(0, colon);
+                if(isTailscaleIpv4(host)) peers.add(host);
+            }
+        }catch(Exception ignored){
+        }
+        return peers;
+    }
+
+    private static boolean isTailscaleIpv4(String ip){
+        if(!validIpv4(ip)) return false;
+        String[] parts = ip.split("\\.");
+        int first = Integer.parseInt(parts[0]);
+        int second = Integer.parseInt(parts[1]);
+        return first == 100 && second >= 64 && second <= 127;
     }
 
     private static long ipv4ToLong(String ip){
