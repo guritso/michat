@@ -119,7 +119,7 @@ public class ChatWindow implements ChatMesh.Listener{
                 if(m.system){
                     Vars.ui.chatfrag.addMessage("[gray]" + who(m.name) + " " + esc(m.text));
                 }else if(!m.self){
-                    Vars.ui.chatfrag.addMessage(who(m.name) + ": " + esc(m.text));
+                    Vars.ui.chatfrag.addMessage("(" + who(m.name) + "): " + esc(m.text));
                 }
             }
             rebuildMessages();
@@ -138,7 +138,7 @@ public class ChatWindow implements ChatMesh.Listener{
                 list.add("[#a2a2a2]" + who(m.name) + " " + esc(m.text))
                     .left().growX().pad(1f, 6f, 1f, 6f).row();
             }else{
-                Label label = new Label(who(m.name) + ": [white]" + esc(m.text));
+                Label label = new Label("(" + who(m.name) + "): [white]" + esc(m.text));
                 label.setWrap(true);
                 list.add(label).left().growX().width(winWidth - 44f).pad(1f, 6f, 1f, 6f).row();
             }
@@ -148,7 +148,7 @@ public class ChatWindow implements ChatMesh.Listener{
 
     /** Names may carry the player's own native color markup. */
     private static String who(String name){
-        if(name.startsWith("[")) return name;
+        if(name.startsWith("[")) return name + "[]";
         return "[" + nameColor(name) + "]" + esc(name) + "[]";
     }
 

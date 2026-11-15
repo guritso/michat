@@ -6,6 +6,7 @@ import mindustry.Vars;
 import mindustry.game.EventType.ClientChatEvent;
 import mindustry.game.EventType.ClientLoadEvent;
 import mindustry.game.EventType.ResizeEvent;
+import mindustry.game.EventType.WorldLoadEvent;
 import mindustry.gen.Icon;
 import mindustry.mod.Mod;
 
@@ -30,6 +31,24 @@ public class MiChat extends Mod{
                     mesh.send(ev.message);
                 }
             });
+
+            // announce match starts to peers
+            Events.on(WorldLoadEvent.class, ev -> Core.app.post(() -> {
+                try{
+                    StringBuilder sb = new StringBuilder("entered a match: ");
+                    if(Vars.state.map != null){
+                        sb.append("'").append(Vars.state.map.name()).append("'");
+                        sb.append(" (").append(Vars.state.map.width)
+                            .append("x").append(Vars.state.map.height);
+                        if(Vars.state.rules.mode() != null){
+                            sb.append(", ").append(Vars.state.rules.mode());
+                        }
+                        sb.append(")");
+                    }
+                    mesh.announce(sb.toString());
+                }catch(Exception ignored){
+                }
+            }));
         });
     }
 }

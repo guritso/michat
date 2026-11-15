@@ -22,6 +22,7 @@ public class ChatMesh{
 
     private static final String HELLO = "MICHAT1";
     private static final String PREFIX = "MICHAT_MSG|";
+    private static final String NOTE = "MICHAT_NOTE|";
     private static final int HOP_LIMIT = 4;
     private static final int MAX_HISTORY = 200;
     private static final int MAX_SEEN = 512;
@@ -141,6 +142,20 @@ public class ChatMesh{
         markSeen(id);
         postMessage(name, clean, false, true);
         String line = PREFIX + id + "|0|" + name + "|" + clean;
+        synchronized(lock){
+            for(Peer p : peers) write(p, line);
+        }
+    }
+
+    /** Broadcasts a system-style note (e.g. match announcements) to all peers. */
+    public void announce(String text){
+        String clean = sanitize(text, 200);
+        if(clean.isEmpty()) return;
+        String name = myName();
+        String id = randomId();
+        markSeen(id);
+        postMessage(name, clean, true, false);
+        String line = NOTE + id + "|0|" + name + "|" + clean;
         synchronized(lock){
             for(Peer p : peers) write(p, line);
         }
@@ -307,6 +322,25 @@ public class ChatMesh{
             postMessage(name, text, false, false);
             if(hop < HOP_LIMIT){
                 forward(peer, PREFIX + id + "|" + (hop + 1) + "|" + name + "|" + text);
+            }
+        }
+        if(line.startsWith(NOTE)){
+            String[] parts = line.split("\\|", 5);
+            if(parts.length < 5) return;
+            String id = parts[1];
+            String name = sanitize(parts[3], 64);
+            String text = sanitize(parts[4], 200);
+            int hop;
+            try{
+                hop = Integer.parseInt(parts[2]);
+            }catch(Exception e){
+                return;
+            }
+            if(!markSeen(id)) return;
+            if(name.isEmpty() || text.isEmpty()) return;
+            postMessage(name, text, true, false);
+            if(hop < HOP_LIMIT){
+                forward(peer, NOTE + id + "|" + (hop + 1) + "|" + name + "|" + text);
             }
         }
     }
