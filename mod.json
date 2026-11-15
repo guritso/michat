@@ -3,7 +3,7 @@
   "displayName": "MiChat",
   "author": "guritso",
   "description": "Peer-to-peer chat over WireGuard, Tailscale, or your local LAN. Chat across separate single-player and campaign sessions without hosting the same server, share schematics, and use native chat alongside MiChat when hosting or joining a server.",
-  "version": "1.8.4",
+  "version": "1.8.5",
   "minGameVersion": 160,
   "main": "michat.MiChat"
 }

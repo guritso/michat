@@ -149,15 +149,29 @@ public class ChatWindow extends BaseDialog implements ChatMesh.Listener{
             // The menu has no native chat feed, so briefly surface incoming messages there too.
             if(inMenu && !m.self && Vars.ui != null){
                 if(m.schem != null){
-                    Vars.ui.showInfoFade(esc(m.name) + " shared schematic '" + esc(m.text) + "'");
+                    showMenuAlert(esc(m.name) + " shared schematic '" + esc(m.text) + "'");
                 }else if(m.system){
-                    Vars.ui.showInfoFade("[gray]" + who(m.name) + " " + esc(m.text));
+                    showMenuAlert("[gray]" + who(m.name) + " " + esc(m.text));
                 }else{
-                    Vars.ui.showInfoFade(nativeFormat(m.name, esc(m.text)));
+                    showMenuAlert(nativeFormat(m.name, esc(m.text)));
                 }
             }
             rebuildMessages();
         });
+    }
+
+    private static void showMenuAlert(String text){
+        Table toast = new Table();
+        toast.setFillParent(true);
+        toast.touchable = Touchable.disabled;
+        toast.bottom();
+        float width = Math.max(220f, Core.scene.getWidth() - 40f);
+        toast.table(Styles.black3, box -> box.margin(8f)
+            .add(text).style(Styles.outlineLabel).wrap().width(width))
+            .width(width).padBottom(24f);
+        toast.actions(arc.scene.actions.Actions.fadeOut(7f, arc.math.Interp.fade),
+            arc.scene.actions.Actions.remove());
+        Core.scene.add(toast);
     }
 
     @Override
