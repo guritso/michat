@@ -8,7 +8,9 @@ import arc.scene.ui.*;
 import arc.scene.ui.layout.*;
 import arc.util.*;
 import mindustry.Vars;
+import mindustry.gen.Groups;
 import mindustry.gen.Icon;
+import mindustry.gen.Player;
 import mindustry.graphics.Pal;
 import mindustry.ui.Styles;
 
@@ -118,7 +120,7 @@ public class ChatWindow implements ChatMesh.Listener{
                 // skip own messages: the native chat already echoes them via the server
                 if(m.system){
                     Vars.ui.chatfrag.addMessage("[gray]" + who(m.name) + " " + esc(m.text));
-                }else if(!m.self){
+                }else if(!m.self && !inSameMatch(m.name)){
                     Vars.ui.chatfrag.addMessage("(" + who(m.name) + "): " + esc(m.text));
                 }
             }
@@ -150,6 +152,16 @@ public class ChatWindow implements ChatMesh.Listener{
     private static String who(String name){
         if(name.startsWith("[")) return name + "[]";
         return "[" + nameColor(name) + "]" + esc(name) + "[]";
+    }
+
+    /** True when the sender is a player in the local match: the server already delivers their chat. */
+    private static boolean inSameMatch(String name){
+        if(!Vars.state.isGame() || Groups.player == null) return false;
+        String raw = Strings.stripColors(name);
+        for(Player p : Groups.player){
+            if(p != null && Strings.stripColors(p.name).equals(raw)) return true;
+        }
+        return false;
     }
 
     private void rebuildStatus(){
