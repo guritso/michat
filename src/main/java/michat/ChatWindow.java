@@ -81,7 +81,8 @@ public class ChatWindow extends BaseDialog implements ChatMesh.Listener{
         cont.add(statusRow).growX().left().row();
 
         list = new Table();
-        list.top().left().margin(6f);
+        // Match the native chat: keep recent messages at the bottom, with history rising above.
+        list.bottom().left().margin(6f);
         scroll = new ScrollPane(list, Styles.smallPane);
         scroll.setScrollingDisabled(true, false);
         cont.add(scroll).growX().height(listHeight).row();
