@@ -23,9 +23,11 @@ public class ChatMesh{
     private static final String HELLO = "MICHAT1";
     private static final String PREFIX = "MICHAT_MSG|";
     private static final String NOTE = "MICHAT_NOTE|";
+    private static final String SCHEM = "MICHAT_SCHEM|";
     private static final int HOP_LIMIT = 4;
     private static final int MAX_HISTORY = 200;
     private static final int MAX_SEEN = 512;
+    private static final int MAX_SCHEM = 90000;
 
     public interface Listener{
         void onMessage(Message message);
@@ -67,11 +69,18 @@ public class ChatMesh{
 
     public static class Message{
         public final String name, text;
+        /** base64 schematic code when this message carries a schematic, null otherwise */
+        public final String schem;
         public final boolean system, self;
 
         Message(String name, String text, boolean system, boolean self){
+            this(name, text, system, self, null);
+        }
+
+        Message(String name, String text, boolean system, boolean self, String schem){
             this.name = name;
             this.text = text;
+            this.schem = schem;
             this.system = system;
             this.self = self;
         }
@@ -157,6 +166,21 @@ public class ChatMesh{
         // self = true so the sender does not mirror their own note back into the native chat
         postMessage(name, clean, true, true);
         String line = NOTE + id + "|0|" + name + "|" + clean;
+        synchronized(lock){
+            for(Peer p : peers) write(p, line);
+        }
+    }
+
+    /** Sends a schematic to all peers. */
+    public void sendSchematic(String schemaName, String code){
+        if(code == null || code.length() > MAX_SCHEM || !code.startsWith("bXNjaAB")) return;
+        String cleanName = sanitize(schemaName, 60).replace("|", " ");
+        if(cleanName.isEmpty()) cleanName = "schema";
+        String name = myName();
+        String id = randomId();
+        markSeen(id);
+        postMessage(name, cleanName, false, true, code);
+        String line = SCHEM + id + "|0|" + name + "|" + cleanName + "|" + code;
         synchronized(lock){
             for(Peer p : peers) write(p, line);
         }
@@ -325,6 +349,27 @@ public class ChatMesh{
                 forward(peer, PREFIX + id + "|" + (hop + 1) + "|" + name + "|" + text);
             }
         }
+        if(line.startsWith(SCHEM)){
+            String[] parts = line.split("\\|", 6);
+            if(parts.length < 6) return;
+            String id = parts[1];
+            String name = sanitize(parts[3], 64);
+            String text = sanitize(parts[4], 60).replace("|", " ");
+            String code = parts[5];
+            int hop;
+            try{
+                hop = Integer.parseInt(parts[2]);
+            }catch(Exception e){
+                return;
+            }
+            if(!markSeen(id)) return;
+            if(name.isEmpty() || text.isEmpty()) return;
+            if(code.length() > MAX_SCHEM || !code.startsWith("bXNjaAB")) return;
+            postMessage(name, text, false, false, code);
+            if(hop < HOP_LIMIT){
+                forward(peer, SCHEM + id + "|" + (hop + 1) + "|" + name + "|" + text + "|" + code);
+            }
+        }
         if(line.startsWith(NOTE)){
             String[] parts = line.split("\\|", 5);
             if(parts.length < 5) return;
@@ -401,7 +446,11 @@ public class ChatMesh{
     }
 
     private void postMessage(String name, String text, boolean system, boolean self){
-        Message message = new Message(name, text, system, self);
+        postMessage(name, text, system, self, null);
+    }
+
+    private void postMessage(String name, String text, boolean system, boolean self, String schem){
+        Message message = new Message(name, text, system, self, schem);
         synchronized(lock){
             history.add(message);
             while(history.size() > MAX_HISTORY) history.remove(0);

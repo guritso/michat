@@ -23,6 +23,8 @@ public class MiChat extends Mod{
             window = new ChatWindow(mesh);
 
             Vars.ui.menufrag.addButton("MiChat", Icon.chat, () -> window.toggle());
+            // schematic export dialog gains a "send to chat" option
+            Vars.ui.schematics = new SchemDialog(mesh);
             // native chat is also usable from the main menu; MiChat traffic mirrors into it
             Vars.ui.chatfrag.touchable = Touchable.childrenOnly;
             Vars.ui.chatfrag.visible(() -> Vars.net.active() ? Vars.ui.hudfrag.shown() : Vars.state.isMenu());

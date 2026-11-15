@@ -8,6 +8,8 @@ import arc.scene.ui.*;
 import arc.scene.ui.layout.*;
 import arc.util.*;
 import mindustry.Vars;
+import mindustry.game.Schematic;
+import mindustry.game.Schematics;
 import mindustry.gen.Groups;
 import mindustry.gen.Icon;
 import mindustry.gen.Player;
@@ -168,6 +170,10 @@ public class ChatWindow implements ChatMesh.Listener{
             if(!m.self){
                 Vars.ui.chatfrag.addMessage("[gray]" + who(m.name) + " " + esc(m.text));
             }
+        }else if(m.schem != null){
+            if(!m.self){
+                Vars.ui.chatfrag.addMessage("[gray]" + who(m.name) + " shared schematic '" + esc(m.text) + "'");
+            }
         }else if(!m.self && !(inMatch && !replay && inSameMatch(m.name))){
             // in matches the server already echoes same-match players; in the menu
             // nothing echoes, so own and peer messages are all shown
@@ -182,6 +188,12 @@ public class ChatWindow implements ChatMesh.Listener{
                 Label label = new Label("[#a2a2a2]" + who(m.name) + " " + esc(m.text));
                 label.setWrap(true);
                 list.add(label).left().growX().width(winWidth - 44f).pad(1f, 6f, 1f, 6f).row();
+            }else if(m.schem != null){
+                Label label = new Label("(" + who(m.name) + "): [white]schematic '" + esc(m.text) + "'");
+                label.setWrap(true);
+                list.add(label).left().growX().width(winWidth - 44f - 88f).pad(1f, 6f, 1f, 6f);
+                list.button("Import", () -> importSchematic(m.schem)).size(80f, 30f).pad(1f, 2f, 1f, 6f);
+                list.row();
             }else{
                 Label label = new Label(nativeFormat(m.name, m.text));
                 label.setWrap(true);
@@ -189,6 +201,17 @@ public class ChatWindow implements ChatMesh.Listener{
             }
         }
         toBottom();
+    }
+
+    /** Imports a schematic received over the mesh. */
+    private static void importSchematic(String code){
+        try{
+            Schematic s = Schematics.readBase64(code);
+            Vars.schematics.add(s);
+            Vars.ui.showInfoToast("schematic imported", 3f);
+        }catch(Exception e){
+            Vars.ui.showException(e);
+        }
     }
 
     /** Names may carry the player's own native color markup. */
