@@ -37,6 +37,7 @@ public class ChatWindow extends BaseDialog implements ChatMesh.Listener{
     private ScrollPane scroll;
     private TextField field;
     private float winWidth;
+    private static Table menuAlertStack;
 
     public ChatWindow(ChatMesh mesh, MatchChatFragment matchChat){
         super("MiChat");
@@ -161,17 +162,32 @@ public class ChatWindow extends BaseDialog implements ChatMesh.Listener{
     }
 
     private static void showMenuAlert(String text){
-        Table toast = new Table();
-        toast.setFillParent(true);
-        toast.touchable = Touchable.disabled;
-        toast.bottom();
-        float width = Math.max(220f, Core.scene.getWidth() - 40f);
-        toast.table(Styles.black3, box -> box.margin(8f)
-            .add(text).style(Styles.outlineLabel).wrap().width(width))
-            .width(width).padBottom(24f);
-        toast.actions(arc.scene.actions.Actions.fadeOut(7f, arc.math.Interp.fade),
-            arc.scene.actions.Actions.remove());
-        Core.scene.add(toast);
+        if(menuAlertStack == null || menuAlertStack.getScene() != Core.scene){
+            menuAlertStack = new Table();
+            menuAlertStack.setFillParent(true);
+            menuAlertStack.touchable = Touchable.disabled;
+            menuAlertStack.bottom().center();
+            Core.scene.add(menuAlertStack);
+        }
+
+        float width = Math.max(120f, Math.min(480f, Core.scene.getWidth() - 40f));
+        Table toast = new Table(Styles.black3);
+        toast.margin(8f);
+        Label label = new Label(text, Styles.outlineLabel);
+        label.setWrap(true);
+        toast.add(label).width(width).left();
+        Table stack = menuAlertStack;
+        stack.add(toast).width(width + 16f).padBottom(6f).row();
+        toast.actions(arc.scene.actions.Actions.sequence(
+            arc.scene.actions.Actions.fadeOut(7f, arc.math.Interp.fade),
+            arc.scene.actions.Actions.run(() -> {
+                toast.remove();
+                if(stack.getChildren().size == 0){
+                    stack.remove();
+                    if(menuAlertStack == stack) menuAlertStack = null;
+                }
+            })
+        ));
     }
 
     @Override

@@ -18,7 +18,7 @@ import java.util.concurrent.*;
 public class ChatMesh{
     public static final int PORT = 26319;
     /** mod version, synced with mod.json; broadcast in the HELLO handshake */
-    public static final String VERSION = "1.8.5";
+    public static final String VERSION = "1.8.6";
 
     private static final String HELLO = "MICHAT1";
     private static final String PREFIX = "MICHAT_MSG|";
@@ -673,6 +673,7 @@ public class ChatMesh{
     private static DiscoveryAddress findDiscoveryAddress(){
         try{
             Enumeration<NetworkInterface> ifs = NetworkInterface.getNetworkInterfaces();
+            DiscoveryAddress tenFallback = null;
             DiscoveryAddress localFallback = null;
             DiscoveryAddress physicalFallback = null;
             while(ifs.hasMoreElements()){
@@ -686,6 +687,10 @@ public class ChatMesh{
                     if(vpn) return new DiscoveryAddress(s, iface.getNetworkPrefixLength(), true);
                     if(isPrivateIpv4((Inet4Address)a)){
                         DiscoveryAddress candidate = new DiscoveryAddress(s, iface.getNetworkPrefixLength(), false);
+                        if(isTenAddress((Inet4Address)a) && tenFallback == null){
+                            // Preserve detection for WireGuard setups whose OS hides tunnel names.
+                            tenFallback = new DiscoveryAddress(s, iface.getNetworkPrefixLength(), true);
+                        }
                         if(!nif.isVirtual() && !isVirtualInterfaceName(nif)){
                             if(physicalFallback == null) physicalFallback = candidate;
                         }else if(localFallback == null){
@@ -694,6 +699,7 @@ public class ChatMesh{
                     }
                 }
             }
+            if(tenFallback != null) return tenFallback;
             return physicalFallback == null ? localFallback : physicalFallback;
         }catch(Exception e){
             return null;
@@ -705,6 +711,10 @@ public class ChatMesh{
         int first = b[0] & 0xff, second = b[1] & 0xff;
         return first == 10 || (first == 172 && second >= 16 && second <= 31) ||
             (first == 192 && second == 168);
+    }
+
+    private static boolean isTenAddress(Inet4Address address){
+        return (address.getAddress()[0] & 0xff) == 10;
     }
 
     private static Set<String> activeTailscalePeers(){
@@ -744,10 +754,11 @@ public class ChatMesh{
     private static boolean isVpnNamed(NetworkInterface nif){
         String name = nif.getName() == null ? "" : nif.getName().toLowerCase();
         String display = nif.getDisplayName() == null ? "" : nif.getDisplayName().toLowerCase();
-        return name.startsWith("wg") || name.startsWith("tun") || name.startsWith("tailscale") ||
+        return name.startsWith("wg") || name.contains("wireguard") || name.startsWith("tun") ||
+            name.startsWith("tailscale") || name.contains("wintun") ||
             name.startsWith("utun") || name.startsWith("tap") || name.startsWith("ppp") ||
             name.contains("vpn") || display.contains("wireguard") || display.contains("tailscale") ||
-            display.startsWith("tun");
+            display.startsWith("tun") || display.contains("wintun");
     }
 
     private static boolean isVirtualInterfaceName(NetworkInterface nif){
