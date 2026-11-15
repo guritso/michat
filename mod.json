@@ -2,8 +2,8 @@
   "name": "michat",
   "displayName": "MiChat",
   "author": "guritso",
-  "description": "Peer-to-peer chat for players on the same VPN network (WireGuard/Tailscale/any tunnel). Auto-detects peers, mirrors messages into the native in-match chat and shares schematics between devices. Works on desktop and Android; install via Mods > Import > GitHub.",
-  "version": "1.6.3",
+  "description": "Chat with friends over your VPN without joining or hosting the same Mindustry server. MiChat connects separate single-player and campaign sessions, shares schematics, and also works alongside the native chat when you host or join a server.",
+  "version": "1.6.4",
   "minGameVersion": 160,
   "main": "michat.MiChat"
 }
