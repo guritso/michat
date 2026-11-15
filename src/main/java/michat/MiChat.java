@@ -32,7 +32,7 @@ public class MiChat extends Mod{
                 }
             });
 
-            // announce match starts to peers
+            // announce match starts to peers, then replay recent mesh history into the native chat
             Events.on(WorldLoadEvent.class, ev -> Core.app.post(() -> {
                 try{
                     StringBuilder sb = new StringBuilder("entered '");
@@ -48,6 +48,7 @@ public class MiChat extends Mod{
                     mesh.announce(sb.toString());
                 }catch(Exception ignored){
                 }
+                if(window != null) window.onMatchLoaded();
             }));
         });
     }

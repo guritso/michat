@@ -15,8 +15,12 @@ import mindustry.graphics.Pal;
 import mindustry.ui.Styles;
 
 
+import java.util.List;
+
 /** Minimal, native-looking chat window. */
 public class ChatWindow implements ChatMesh.Listener{
+    private static final int REPLAY_LIMIT = 25;
+
     private final ChatMesh mesh;
 
     private Table root;
@@ -130,6 +134,25 @@ public class ChatWindow implements ChatMesh.Listener{
     @Override
     public void onStatus(){
         Core.app.post(this::rebuildStatus);
+    }
+
+    /** Replays recent mesh history into the native chat when a match starts. */
+    public void onMatchLoaded(){
+        Core.app.post(() -> {
+            if(!Vars.state.isGame() || Vars.ui == null) return;
+            List<ChatMesh.Message> h = mesh.history();
+            int from = Math.max(0, h.size() - REPLAY_LIMIT);
+            for(int i = from; i < h.size(); i++){
+                ChatMesh.Message m = h.get(i);
+                // own messages were already visible when sent; notes from peers and history are shown
+                if(m.self) continue;
+                if(m.system){
+                    Vars.ui.chatfrag.addMessage("[gray]" + who(m.name) + " " + esc(m.text));
+                }else{
+                    Vars.ui.chatfrag.addMessage(nativeFormat(m.name, m.text));
+                }
+            }
+        });
     }
 
     private void rebuildMessages(){
