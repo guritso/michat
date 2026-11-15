@@ -125,6 +125,10 @@ public class ChatWindow implements ChatMesh.Listener{
     public void onMessage(ChatMesh.Message m){
         Core.app.post(() -> {
             deliver(m, false);
+            // visible arrival notice; works in the menu where showInfoToast is hidden by the game
+            if(m.schem != null && !m.self){
+                Vars.ui.showInfoFade(esc(m.name) + " shared schematic '" + esc(m.text) + "'");
+            }
             rebuildMessages();
         });
     }
@@ -196,7 +200,7 @@ public class ChatWindow implements ChatMesh.Listener{
         try{
             Schematic s = Schematics.readBase64(code);
             Vars.schematics.add(s);
-            Vars.ui.showInfoToast("schematic imported", 3f);
+            Vars.ui.showInfoFade("schematic imported");
         }catch(Exception e){
             Vars.ui.showException(e);
         }

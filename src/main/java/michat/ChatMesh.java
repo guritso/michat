@@ -171,7 +171,6 @@ public class ChatMesh{
         }
     }
 
-    /** Sends a schematic to all peers. */
     /** Sends a schematic to all peers. Returns false when the code was rejected. */
     public boolean sendSchematic(String schemaName, String code){
         if(code == null || code.length() > MAX_SCHEM || !code.startsWith("bXNjaAB")) return false;
