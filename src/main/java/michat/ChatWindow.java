@@ -115,9 +115,10 @@ public class ChatWindow implements ChatMesh.Listener{
             // while playing, mesh messages are mirrored into the native chat
             if(!h.isEmpty() && Vars.state.isGame() && Vars.ui != null){
                 ChatMesh.Message m = h.get(h.size() - 1);
+                // skip own messages: the native chat already echoes them via the server
                 if(m.system){
                     Vars.ui.chatfrag.addMessage("[gray]" + esc(m.name) + " " + esc(m.text));
-                }else{
+                }else if(!m.self){
                     Vars.ui.chatfrag.addMessage(who(m.name) + ": " + esc(m.text));
                 }
             }
