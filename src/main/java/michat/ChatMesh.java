@@ -174,9 +174,8 @@ public class ChatMesh{
     /** Sends a schematic to all peers. Returns false when the code was rejected. */
     public boolean sendSchematic(String schemaName, String code){
         log("send schematic '" + schemaName + "': code " +
-            (code == null ? "null" : code.length() + " chars, starts " +
-                (code.length() >= 7 ? code.substring(0, 7) : code)));
-        if(code == null || code.length() > MAX_SCHEM || !code.startsWith("bXNjaAB")) return false;
+            (code == null ? "null" : code.length() + " chars"));
+        if(code == null || code.length() > MAX_SCHEM || !code.startsWith(Vars.schematicBaseStart)) return false;
         String cleanName = sanitize(schemaName, 60).replace("|", " ");
         if(cleanName.isEmpty()) cleanName = "schema";
         String name = myName();
@@ -373,7 +372,7 @@ public class ChatMesh{
             }
             if(!markSeen(id)) return;
             if(name.isEmpty() || text.isEmpty()) return;
-            if(code.length() > MAX_SCHEM || !code.startsWith("bXNjaAB")) return;
+            if(code.length() > MAX_SCHEM || !code.startsWith(Vars.schematicBaseStart)) return;
             log("schematic accepted from " + name + ": '" + text + "', " + code.length() + " chars");
             postMessage(name, text, false, false, code);
             if(hop < HOP_LIMIT){
