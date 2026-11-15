@@ -137,8 +137,9 @@ public class ChatWindow implements ChatMesh.Listener{
         list.clear();
         for(ChatMesh.Message m : mesh.history()){
             if(m.system){
-                list.add("[#a2a2a2]" + who(m.name) + " " + esc(m.text))
-                    .left().growX().pad(1f, 6f, 1f, 6f).row();
+                Label label = new Label("[#a2a2a2]" + who(m.name) + " " + esc(m.text));
+                label.setWrap(true);
+                list.add(label).left().growX().width(winWidth - 44f).pad(1f, 6f, 1f, 6f).row();
             }else{
                 Label label = new Label("(" + who(m.name) + "): [white]" + esc(m.text));
                 label.setWrap(true);
