@@ -144,8 +144,7 @@ public class ChatWindow extends BaseDialog implements ChatMesh.Listener{
                 (m.self ? " (self)" : " (peer)"));
             boolean inMenu = Vars.ui == null || !Vars.state.isGame();
             if(deliver(m, false) || inMenu){
-                // same arrival sound the native chat plays for received packets
-                Sounds.uiChat.play();
+                Sounds.uiNotify.play();
             }
             // The menu has no native chat feed, so briefly surface incoming messages there too.
             if(inMenu && !m.self && Vars.ui != null){
