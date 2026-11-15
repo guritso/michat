@@ -2,6 +2,7 @@ package michat;
 
 import arc.Core;
 import arc.Events;
+import arc.scene.event.Touchable;
 import mindustry.Vars;
 import mindustry.game.EventType.ClientChatEvent;
 import mindustry.game.EventType.ClientLoadEvent;
@@ -22,6 +23,10 @@ public class MiChat extends Mod{
             window = new ChatWindow(mesh);
 
             Vars.ui.menufrag.addButton("MiChat", Icon.chat, () -> window.toggle());
+            // native chat is also usable from the main menu; MiChat traffic mirrors into it
+            Vars.ui.chatfrag.touchable = Touchable.childrenOnly;
+            Vars.ui.chatfrag.visible(() -> Vars.net.active() ? Vars.ui.hudfrag.shown() : Vars.state.isMenu());
+            Vars.ui.menufrag.addButton("Chat", Icon.chat, () -> Vars.ui.chatfrag.toggle());
             // the menu only rebuilds its button grid on resize events
             Events.fire(new ResizeEvent());
 
@@ -32,8 +37,9 @@ public class MiChat extends Mod{
                 }
             });
 
-            // announce match starts to peers, then replay recent mesh history into the native chat
+            // replay pending history, then announce the match start to peers
             Events.on(WorldLoadEvent.class, ev -> Core.app.post(() -> {
+                if(window != null) window.onMatchLoaded();
                 try{
                     StringBuilder sb = new StringBuilder("entered '");
                     if(Vars.state.map != null){
@@ -48,7 +54,6 @@ public class MiChat extends Mod{
                     mesh.announce(sb.toString());
                 }catch(Exception ignored){
                 }
-                if(window != null) window.onMatchLoaded();
             }));
         });
     }

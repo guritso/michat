@@ -12,6 +12,7 @@ import mindustry.gen.Groups;
 import mindustry.gen.Icon;
 import mindustry.gen.Player;
 import mindustry.graphics.Pal;
+import mindustry.input.Binding;
 import mindustry.ui.Styles;
 
 
@@ -22,6 +23,8 @@ public class ChatWindow implements ChatMesh.Listener{
     private static final int REPLAY_LIMIT = 25;
 
     private final ChatMesh mesh;
+    // last mesh message already handled by the native chat (delivered or intentionally skipped)
+    private ChatMesh.Message lastDelivered;
 
     private Table root;
     private Table list;
@@ -94,6 +97,17 @@ public class ChatWindow implements ChatMesh.Listener{
         root.add(box).width(w).maxHeight(boxH);
         Core.scene.add(root);
 
+        // open/send the native chat with the chat key while in the main menu
+        root.update(() -> {
+            if(Vars.state.isGame() || Vars.net.active() || Vars.ui == null) return;
+            if(Core.input.keyTap(Binding.chat) && !Vars.ui.consolefrag.shown()){
+                Element focus = Core.scene.getKeyboardFocus();
+                if(Vars.ui.chatfrag.shown() || !(focus instanceof TextField)){
+                    Vars.ui.chatfrag.toggle();
+                }
+            }
+        });
+
         rebuildStatus();
         rebuildMessages();
     }
@@ -116,17 +130,7 @@ public class ChatWindow implements ChatMesh.Listener{
     @Override
     public void onMessage(ChatMesh.Message m){
         Core.app.post(() -> {
-            // while playing, mesh messages are mirrored into the native chat
-            if(Vars.state.isGame() && Vars.ui != null){
-                // skip own messages: the native chat already echoes them via the server
-                if(m.system){
-                    if(!m.self){
-                        Vars.ui.chatfrag.addMessage("[gray]" + who(m.name) + " " + esc(m.text));
-                    }
-                }else if(!m.self && !inSameMatch(m.name)){
-                    Vars.ui.chatfrag.addMessage(nativeFormat(m.name, m.text));
-                }
-            }
+            deliver(m, false);
             rebuildMessages();
         });
     }
@@ -136,23 +140,39 @@ public class ChatWindow implements ChatMesh.Listener{
         Core.app.post(this::rebuildStatus);
     }
 
-    /** Replays recent mesh history into the native chat when a match starts. */
+    /** Replays mesh history not yet handled into the native chat when a match starts. */
     public void onMatchLoaded(){
         Core.app.post(() -> {
             if(!Vars.state.isGame() || Vars.ui == null) return;
             List<ChatMesh.Message> h = mesh.history();
-            int from = Math.max(0, h.size() - REPLAY_LIMIT);
-            for(int i = from; i < h.size(); i++){
-                ChatMesh.Message m = h.get(i);
-                // own messages were already visible when sent; notes from peers and history are shown
-                if(m.self) continue;
-                if(m.system){
-                    Vars.ui.chatfrag.addMessage("[gray]" + who(m.name) + " " + esc(m.text));
-                }else{
-                    Vars.ui.chatfrag.addMessage(nativeFormat(m.name, m.text));
-                }
+            int idx = lastDelivered == null ? -1 : h.indexOf(lastDelivered);
+            int start = idx >= 0 ? Math.min(idx + 1, h.size()) : Math.max(0, h.size() - REPLAY_LIMIT);
+            for(int i = start; i < h.size(); i++){
+                deliver(h.get(i), true);
             }
         });
+    }
+
+    /**
+     * Sends one mesh message to the native chat when appropriate, tracking what was handled.
+     * Messages that arrive while a match is loading are left for the match-load replay.
+     */
+    private void deliver(ChatMesh.Message m, boolean replay){
+        if(Vars.ui == null) return;
+        boolean inMatch = Vars.state.isGame();
+        boolean menu = Vars.state.isMenu() && !Vars.net.active();
+        if(!inMatch && !menu) return; // loading: keep it for the replay
+        // everything up to here has been handled, even when intentionally skipped below
+        lastDelivered = m;
+        if(m.system){
+            if(!m.self){
+                Vars.ui.chatfrag.addMessage("[gray]" + who(m.name) + " " + esc(m.text));
+            }
+        }else if(!m.self && !(inMatch && !replay && inSameMatch(m.name))){
+            // in matches the server already echoes same-match players; in the menu
+            // nothing echoes, so own and peer messages are all shown
+            Vars.ui.chatfrag.addMessage(nativeFormat(m.name, m.text));
+        }
     }
 
     private void rebuildMessages(){
