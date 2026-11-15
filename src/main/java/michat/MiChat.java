@@ -2,7 +2,6 @@ package michat;
 
 import arc.Core;
 import arc.Events;
-import arc.scene.event.Touchable;
 import mindustry.Vars;
 import mindustry.game.EventType.ClientChatEvent;
 import mindustry.game.EventType.ClientLoadEvent;
@@ -23,12 +22,8 @@ public class MiChat extends Mod{
             window = new ChatWindow(mesh);
 
             Vars.ui.menufrag.addButton("MiChat", Icon.chat, () -> window.toggle());
-            // schematic export dialog gains a "send to chat" option
+            // schematic export dialog gains a "send to chat" option (in-match access reads this field)
             Vars.ui.schematics = new SchemDialog(mesh);
-            // native chat is also usable from the main menu; MiChat traffic mirrors into it
-            Vars.ui.chatfrag.touchable = Touchable.childrenOnly;
-            Vars.ui.chatfrag.visible(() -> Vars.net.active() ? Vars.ui.hudfrag.shown() : Vars.state.isMenu());
-            Vars.ui.menufrag.addButton("Chat", Icon.chat, () -> Vars.ui.chatfrag.toggle());
             // the menu only rebuilds its button grid on resize events
             Events.fire(new ResizeEvent());
 

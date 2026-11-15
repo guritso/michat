@@ -14,7 +14,6 @@ import mindustry.gen.Groups;
 import mindustry.gen.Icon;
 import mindustry.gen.Player;
 import mindustry.graphics.Pal;
-import mindustry.input.Binding;
 import mindustry.ui.Styles;
 
 
@@ -25,6 +24,7 @@ public class ChatWindow implements ChatMesh.Listener{
     private static final int REPLAY_LIMIT = 25;
 
     private final ChatMesh mesh;
+    private final SchemaPicker picker;
     // last mesh message already handled by the native chat (delivered or intentionally skipped)
     private ChatMesh.Message lastDelivered;
 
@@ -39,6 +39,7 @@ public class ChatWindow implements ChatMesh.Listener{
     public ChatWindow(ChatMesh mesh){
         this.mesh = mesh;
         mesh.addListener(this);
+        this.picker = new SchemaPicker(mesh);
         build();
     }
 
@@ -72,6 +73,8 @@ public class ChatWindow implements ChatMesh.Listener{
 
         Table head = new Table();
         head.add("MiChat").color(Pal.accent).growX().left();
+        head.button(Icon.upload, Styles.cleari, () -> picker.show()).size(closeSize).get()
+            .resizeImage(closeSize * 0.6f);
         head.button(Icon.cancel, Styles.cleari, () -> toggle()).size(closeSize).get()
             .resizeImage(closeSize * 0.6f);
         box.add(head).growX().row();
@@ -98,17 +101,6 @@ public class ChatWindow implements ChatMesh.Listener{
 
         root.add(box).width(w).maxHeight(boxH);
         Core.scene.add(root);
-
-        // open/send the native chat with the chat key while in the main menu
-        root.update(() -> {
-            if(Vars.state.isGame() || Vars.net.active() || Vars.ui == null) return;
-            if(Core.input.keyTap(Binding.chat) && !Vars.ui.consolefrag.shown()){
-                Element focus = Core.scene.getKeyboardFocus();
-                if(Vars.ui.chatfrag.shown() || !(focus instanceof TextField)){
-                    Vars.ui.chatfrag.toggle();
-                }
-            }
-        });
 
         rebuildStatus();
         rebuildMessages();
@@ -160,10 +152,7 @@ public class ChatWindow implements ChatMesh.Listener{
      * Messages that arrive while a match is loading are left for the match-load replay.
      */
     private void deliver(ChatMesh.Message m, boolean replay){
-        if(Vars.ui == null) return;
-        boolean inMatch = Vars.state.isGame();
-        boolean menu = Vars.state.isMenu() && !Vars.net.active();
-        if(!inMatch && !menu) return; // loading: keep it for the replay
+        if(Vars.ui == null || !Vars.state.isGame()) return; // outside matches the native chat is not used
         // everything up to here has been handled, even when intentionally skipped below
         lastDelivered = m;
         if(m.system){
@@ -171,12 +160,11 @@ public class ChatWindow implements ChatMesh.Listener{
                 Vars.ui.chatfrag.addMessage("[gray]" + who(m.name) + " " + esc(m.text));
             }
         }else if(m.schem != null){
-            if(!m.self){
-                Vars.ui.chatfrag.addMessage("[gray]" + who(m.name) + " shared schematic '" + esc(m.text) + "'");
-            }
-        }else if(!m.self && !(inMatch && !replay && inSameMatch(m.name))){
-            // in matches the server already echoes same-match players; in the menu
-            // nothing echoes, so own and peer messages are all shown
+            // schematics only travel via the mesh, so the same-match and own-message
+            // dedup used for server-echoed chat does not apply to them
+            Vars.ui.chatfrag.addMessage("[gray]" + who(m.name) + " shared schematic '" + esc(m.text) + "'");
+        }else if(!m.self && !(!replay && inSameMatch(m.name))){
+            // in matches the server already echoes same-match players
             Vars.ui.chatfrag.addMessage(nativeFormat(m.name, m.text));
         }
     }
