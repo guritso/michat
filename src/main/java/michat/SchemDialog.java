@@ -23,7 +23,8 @@ public class SchemDialog extends SchematicsDialog{
 
     @Override
     public void showExport(Schematic s){
-        BaseDialog dialog = new BaseDialog("@editor.export");
+        // title marks this dialog as the mod's, so old mod code on a device is obvious
+        BaseDialog dialog = new BaseDialog("@editor.export [coral][MiChat v" + ChatMesh.VERSION + "[]");
         dialog.cont.pane(p -> {
             p.margin(10f);
             p.table(Tex.button, t -> {
