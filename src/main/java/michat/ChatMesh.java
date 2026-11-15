@@ -19,6 +19,8 @@ import java.util.concurrent.*;
  */
 public class ChatMesh{
     public static final int PORT = 26319;
+    /** mod version, synced with mod.json; broadcast in the HELLO handshake */
+    public static final String VERSION = "1.4.7";
 
     private static final String HELLO = "MICHAT1";
     private static final String PREFIX = "MICHAT_MSG|";
@@ -37,6 +39,8 @@ public class ChatMesh{
     public static class Peer{
         public final String ip;
         public String name;
+        /** michat version of the peer, "?" for older versions without the handshake */
+        public String version;
         public final boolean outgoing;
         final Socket socket;
         final BufferedReader in;
@@ -55,13 +59,14 @@ public class ChatMesh{
     }
 
     public static class Probe{
-        final String ip, name;
+        final String ip, name, version;
         final Socket socket;
         final boolean outgoing;
 
-        Probe(String ip, String name, Socket socket, boolean outgoing){
+        Probe(String ip, String name, String version, Socket socket, boolean outgoing){
             this.ip = ip;
             this.name = name;
+            this.version = version;
             this.socket = socket;
             this.outgoing = outgoing;
         }
@@ -132,7 +137,11 @@ public class ChatMesh{
     public String peerSummary(){
         synchronized(lock){
             Seq<String> names = new Seq<>();
-            for(Peer p : peers) names.add(p.name);
+            for(Peer p : peers){
+                String v = p.version == null || p.version.isEmpty() ? "?" : p.version;
+                // flag peers running a different michat version, a common cause of "it does not work"
+                names.add(VERSION.equals(p.version) ? p.name : p.name + " (v" + v + ")");
+            }
             return String.join(", ", names.toArray(String.class));
         }
     }
@@ -226,6 +235,15 @@ public class ChatMesh{
         }
     }
 
+    /** Splits a HELLO body into sanitized name and version parts. */
+    private static String[] helloParts(String body){
+        String[] hp = body.split("\\|", 2);
+        return new String[]{
+            sanitize(hp[0], 64),
+            hp.length > 1 ? sanitize(hp[1], 16) : "?"
+        };
+    }
+
     private Probe probe(String target){
         try{
             Socket s = new Socket();
@@ -233,10 +251,11 @@ public class ChatMesh{
             s.setSoTimeout(600);
             BufferedReader in = new BufferedReader(new InputStreamReader(s.getInputStream()));
             PrintWriter out = new PrintWriter(new OutputStreamWriter(s.getOutputStream()), true);
-            out.println(HELLO + " " + myName());
+            out.println(HELLO + " " + myName() + "|" + VERSION);
             String line = in.readLine();
             if(line != null && line.startsWith(HELLO + " ")){
-                return new Probe(target, sanitize(line.substring(HELLO.length() + 1), 64), s, true);
+                String[] hp = helloParts(line.substring(HELLO.length() + 1));
+                return new Probe(target, hp[0], hp[1], s, true);
             }
             s.close();
         }catch(Exception ignored){
@@ -264,9 +283,15 @@ public class ChatMesh{
             }
             try{
                 Peer peer = new Peer(p.ip, p.name, wantOut, p.socket);
+                peer.version = p.version;
                 peers.add(peer);
                 readAsync(peer);
-                log("peer connected: " + p.ip + " (" + p.name + ")");
+                log("peer connected: " + p.ip + " (" + p.name + ", michat v" + p.version + ")");
+                if(!VERSION.equals(p.version)){
+                    String v = p.version == null || p.version.isEmpty() ? "?" : p.version;
+                    postMessage("MiChat", peer.name + " uses michat v" + v + " but this device has v" +
+                        VERSION + " - update both mods to the same version", true, false);
+                }
                 if(!replaced) postMessage(peer.name, "joined the chat", true, false);
             }catch(IOException e){
                 closeQuietly(p.socket);
@@ -297,12 +322,14 @@ public class ChatMesh{
                 s.close();
                 return;
             }
-            String name = sanitize(line.substring(HELLO.length() + 1), 64);
+            String body = line.substring(HELLO.length() + 1);
+            String[] hp = helloParts(body);
+            String name = hp[0];
             // reply with our own greeting so the probing side can complete its handshake
             PrintWriter out = new PrintWriter(new OutputStreamWriter(s.getOutputStream()), true);
-            out.println(HELLO + " " + myName());
+            out.println(HELLO + " " + myName() + "|" + VERSION);
             String ip = s.getInetAddress().getHostAddress();
-            adopt(new Probe(ip, name, s, false));
+            adopt(new Probe(ip, name, hp[1], s, false));
         }catch(Exception e){
             closeQuietly(s);
         }
@@ -330,11 +357,18 @@ public class ChatMesh{
 
     private void handle(Peer peer, String line){
         if(line.startsWith(HELLO + " ")){
-            String n = sanitize(line.substring(HELLO.length() + 1), 64);
+            String[] hp = helloParts(line.substring(HELLO.length() + 1));
+            String n = hp[0];
+            boolean changed = false;
             if(!n.isEmpty() && !n.equals(peer.name)){
                 peer.name = n;
-                statusChanged();
+                changed = true;
             }
+            if(hp[1] != null && !hp[1].isEmpty() && !hp[1].equals(peer.version)){
+                peer.version = hp[1];
+                changed = true;
+            }
+            if(changed) statusChanged();
             return;
         }
         if(line.startsWith(PREFIX)){
