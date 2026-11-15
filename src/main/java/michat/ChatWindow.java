@@ -199,8 +199,7 @@ public class ChatWindow extends BaseDialog implements ChatMesh.Listener{
         list.clear();
         for(ChatMesh.Message m : mesh.history()){
             if(m.system){
-                Label label = new Label("[#a2a2a2]" + who(m.name) + " " + esc(m.text));
-                label.setWrap(true);
+                Label label = messageLabel("[#a2a2a2]" + who(m.name) + " " + esc(m.text));
                 float actionWidth = m.joinIp != null && !m.self ? 48f : 0f;
                 list.add(label).left().growX().width(winWidth - 44f - actionWidth).pad(1f, 6f, 1f, 6f);
                 if(m.joinIp != null && !m.self){
@@ -209,19 +208,24 @@ public class ChatWindow extends BaseDialog implements ChatMesh.Listener{
                 }
                 list.row();
             }else if(m.schem != null){
-                Label label = new Label("(" + who(m.name) + "): [white]schematic '" + esc(m.text) + "'");
-                label.setWrap(true);
+                Label label = messageLabel("(" + who(m.name) + "): [white]schematic '" + esc(m.text) + "'");
                 list.add(label).left().growX().width(winWidth - 44f - 88f).pad(1f, 6f, 1f, 6f);
                 list.button(Icon.download, Styles.cleari, () -> importSchematic(m.schem))
                     .size(40f).pad(1f, 2f, 1f, 6f).get().resizeImage(24f);
                 list.row();
             }else{
-                Label label = new Label(nativeFormat(m.name, m.text));
-                label.setWrap(true);
+                Label label = messageLabel(nativeFormat(m.name, m.text));
                 list.add(label).left().growX().width(winWidth - 44f).pad(1f, 6f, 1f, 6f).row();
             }
         }
         toBottom();
+    }
+
+    private static Label messageLabel(String text){
+        Label label = new Label(text);
+        label.setWrap(true);
+        if(Core.app.isMobile()) label.setFontScale(1.12f);
+        return label;
     }
 
     /** Imports a schematic received over the mesh. */
