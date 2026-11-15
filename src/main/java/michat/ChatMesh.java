@@ -28,7 +28,7 @@ public class ChatMesh{
     private static final int MAX_SEEN = 512;
 
     public interface Listener{
-        void onMessage();
+        void onMessage(Message message);
         void onStatus();
     }
 
@@ -154,7 +154,8 @@ public class ChatMesh{
         String name = myName();
         String id = randomId();
         markSeen(id);
-        postMessage(name, clean, true, false);
+        // self = true so the sender does not mirror their own note back into the native chat
+        postMessage(name, clean, true, true);
         String line = NOTE + id + "|0|" + name + "|" + clean;
         synchronized(lock){
             for(Peer p : peers) write(p, line);
@@ -400,10 +401,11 @@ public class ChatMesh{
     }
 
     private void postMessage(String name, String text, boolean system, boolean self){
+        Message message = new Message(name, text, system, self);
         synchronized(lock){
-            history.add(new Message(name, text, system, self));
+            history.add(message);
             while(history.size() > MAX_HISTORY) history.remove(0);
-            for(Listener l : listeners) l.onMessage();
+            for(Listener l : listeners) l.onMessage(message);
         }
     }
 

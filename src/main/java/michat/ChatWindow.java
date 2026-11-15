@@ -14,7 +14,6 @@ import mindustry.gen.Player;
 import mindustry.graphics.Pal;
 import mindustry.ui.Styles;
 
-import java.util.List;
 
 /** Minimal, native-looking chat window. */
 public class ChatWindow implements ChatMesh.Listener{
@@ -111,17 +110,20 @@ public class ChatWindow implements ChatMesh.Listener{
     }
 
     @Override
-    public void onMessage(){
+    public void onMessage(ChatMesh.Message m){
         Core.app.post(() -> {
-            List<ChatMesh.Message> h = mesh.history();
             // while playing, mesh messages are mirrored into the native chat
-            if(!h.isEmpty() && Vars.state.isGame() && Vars.ui != null){
-                ChatMesh.Message m = h.get(h.size() - 1);
+            if(Vars.state.isGame() && Vars.ui != null){
                 // skip own messages: the native chat already echoes them via the server
                 if(m.system){
-                    Vars.ui.chatfrag.addMessage("[gray]" + who(m.name) + " " + esc(m.text));
+                    if(!m.self){
+                        Vars.ui.chatfrag.addMessage("[gray]" + who(m.name) + " " + esc(m.text));
+                    }
                 }else if(!m.self && !inSameMatch(m.name)){
                     Vars.ui.chatfrag.addMessage("(" + who(m.name) + "): " + esc(m.text));
+                    // temporary diagnostic: shows why the same-match check did not match
+                    Vars.ui.chatfrag.addMessage("[#a2a2a2][michat-dbg] sender=" + esc(m.name)
+                        + " | players=" + esc(matchPlayers()));
                 }
             }
             rebuildMessages();
@@ -158,11 +160,25 @@ public class ChatWindow implements ChatMesh.Listener{
     /** True when the sender is a player in the local match: the server already delivers their chat. */
     private static boolean inSameMatch(String name){
         if(!Vars.state.isGame() || Groups.player == null) return false;
-        String raw = Strings.stripColors(name);
+        String raw = Strings.stripColors(name).trim().toLowerCase();
+        if(raw.isEmpty()) return false;
         for(Player p : Groups.player){
-            if(p != null && Strings.stripColors(p.name).equals(raw)) return true;
+            if(p == null || p.name == null) continue;
+            if(Strings.stripColors(p.name).trim().toLowerCase().equals(raw)) return true;
         }
         return false;
+    }
+
+    /** Stripped names of every player in the local match, for diagnostics. */
+    private static String matchPlayers(){
+        if(Groups.player == null) return "(null)";
+        StringBuilder sb = new StringBuilder();
+        for(Player p : Groups.player){
+            if(p == null || p.name == null) continue;
+            if(sb.length() > 0) sb.append(",");
+            sb.append(Strings.stripColors(p.name).trim());
+        }
+        return sb.length() == 0 ? "(empty)" : sb.toString();
     }
 
     private void rebuildStatus(){
