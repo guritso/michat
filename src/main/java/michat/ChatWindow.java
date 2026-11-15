@@ -43,7 +43,7 @@ public class ChatWindow extends BaseDialog implements ChatMesh.Listener{
         this.mesh = mesh;
         this.matchChat = matchChat;
         addCloseButton();
-        titleTable.button(Icon.play, Styles.cleari, this::showPeerDialog)
+        titleTable.button(Icon.host, Styles.cleari, this::showPeerDialog)
             .size(48f).get().resizeImage(24f);
         mesh.addListener(this);
         build();
