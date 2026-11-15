@@ -31,12 +31,12 @@ jobs:
           (cd build/dex && zip ../libs/michat.jar classes.dex)
       - name: Package mod
         run: |
-          mkdir -p release
-          cp mod.json release/
-          cp icon.png release/
-          cp build/libs/michat.jar release/
           cp build/libs/michat.jar michat.jar
+          mkdir -p release
           cd release
+          # flat layout: the game looks for mod.json, michat/*.class on desktop
+          # and classes.dex at the zip root on Android
+          unzip -o ../build/libs/michat.jar
           zip -r ../michat.zip .
       - uses: softprops/action-gh-release@v2
         with:

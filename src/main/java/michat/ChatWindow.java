@@ -233,6 +233,7 @@ public class ChatWindow implements ChatMesh.Listener{
 
     private void rebuildStatus(){
         statusRow.clear();
+        statusRow.add("[#a2a2a2]v" + ChatMesh.VERSION + " \u00b7 ").left();
         if(!mesh.onVpn()){
             statusRow.add("[#e55454]\u25cf[] [#a2a2a2]no VPN detected").left();
         }else{
