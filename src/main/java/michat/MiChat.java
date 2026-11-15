@@ -3,7 +3,7 @@ package michat;
 import arc.Core;
 import arc.Events;
 import arc.scene.Element;
-import arc.scene.event.ChangeListener;
+import arc.scene.event.ClickListener;
 import arc.scene.event.EventListener;
 import arc.scene.ui.ImageButton;
 import arc.struct.Seq;
@@ -35,20 +35,9 @@ public class MiChat extends Mod{
             // nulling the public cache makes the resize rebuild bind to the new dialog
             Vars.ui.menufrag.desktopButtons = null;
             // the mobile HUD build captured ui.schematics before mods loaded; rebind
-            // the named paste button so it opens the mod's dialog too
-            Element hudPaste = Core.scene.find("schematics");
-            if(hudPaste != null){
-                for(int i = hudPaste.getListeners().size - 1; i >= 0; i--){
-                    if(hudPaste.getListeners().get(i) instanceof ChangeListener){
-                        hudPaste.removeListener(hudPaste.getListeners().get(i));
-                    }
-                }
-                hudPaste.changed(() -> Vars.ui.schematics.show());
-            }
-            // in matches without a server the native chat is hidden and drops messages;
-            // rebind the named HUD chat button (which would open the database there) to the
-            // mod's match chat, keeping the native action whenever a server exists
-            rebindHudChatButton();
+            // the named paste button so it opens the mod's dialog too, and take over the
+            // named chat button in matches without a server (the native chat is unusable there)
+            rebindHudButtons();
             // the menu only rebuilds its button grid on resize events
             Events.fire(new ResizeEvent());
 
@@ -81,34 +70,53 @@ public class MiChat extends Mod{
     }
 
     /**
-     * The mobile HUD has one button that toggles the native chat when networked, and opens
-     * the research/database dialogs otherwise. Take it over only in matches without a server,
-     * where the native chat cannot be seen; call the original behavior in every other state.
-     * Replaces the game's icon updater (Element stores a single one) with merged logic.
+     * Removes the last ClickListener: arc's Button keeps its own internal one first (it drives
+     * the pressed visual and the change event), and Table.button attaches the task's after it.
      */
-    private void rebindHudChatButton(){
-        Element hudChat = Core.scene.find("chat");
-        if(hudChat == null) return;
-
-        Seq<EventListener> originals = new Seq<>();
-        for(EventListener l : hudChat.getListeners()){
-            if(l instanceof ChangeListener) originals.add(l);
-        }
-        for(int i = hudChat.getListeners().size - 1; i >= 0; i--){
-            if(hudChat.getListeners().get(i) instanceof ChangeListener){
-                hudChat.removeListener(hudChat.getListeners().get(i));
+    private static void removeTaskClickListener(Element button){
+        Seq<EventListener> ls = button.getListeners();
+        for(int i = ls.size - 1; i >= 0; i--){
+            if(ls.get(i) instanceof ClickListener){
+                button.removeListener(ls.get(i));
+                return;
             }
         }
+    }
 
-        hudChat.changed(() -> {
+    private void rebindHudButtons(){
+        // paste button: open the mod's export-capable dialog, resolved at click time
+        Element hudPaste = Core.scene.find("schematics");
+        if(hudPaste != null){
+            removeTaskClickListener(hudPaste);
+            hudPaste.clicked(() -> Vars.ui.schematics.show());
+        }
+
+        Element hudChat = Core.scene.find("chat");
+        if(hudChat == null) return;
+        removeTaskClickListener(hudChat);
+        hudChat.clicked(() -> {
             if(matchChat != null && !Vars.net.active() && Vars.state.isGame()){
-                matchChat.toggle();
+                // our match chat: the native chat cannot be seen without a server
+                if(matchChat.shown()){
+                    matchChat.hide();
+                }else{
+                    matchChat.toggle();
+                }
+            }else if(Vars.net.active()){
+                // native behavior, as built in HudFragment
+                if(Vars.ui.chatfrag.shown()){
+                    Vars.ui.chatfrag.hide();
+                }else{
+                    Vars.ui.chatfrag.toggle();
+                }
+            }else if(Vars.state.isCampaign()){
+                Vars.ui.research.show();
             }else{
-                ChangeListener.ChangeEvent ev = new ChangeListener.ChangeEvent();
-                for(EventListener l : originals) l.handle(ev);
+                Vars.ui.database.show();
             }
         });
 
+        // replaces the game's icon updater (Element stores a single one) with merged logic
         hudChat.update(() -> {
             if(hudChat instanceof ImageButton){
                 ImageButton b = (ImageButton)hudChat;
