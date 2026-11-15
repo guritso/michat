@@ -20,7 +20,7 @@ import java.util.concurrent.*;
 public class ChatMesh{
     public static final int PORT = 26319;
     /** mod version, synced with mod.json; broadcast in the HELLO handshake */
-    public static final String VERSION = "1.7.3";
+    public static final String VERSION = "1.8.0";
 
     private static final String HELLO = "MICHAT1";
     private static final String PREFIX = "MICHAT_MSG|";
@@ -107,6 +107,7 @@ public class ChatMesh{
     private final List<Message> history = new ArrayList<>();
     private final Set<String> seen = new HashSet<>();
     private volatile String localIp = "";
+    private volatile boolean usingVpn;
     private ExecutorService scanPool;
 
     public void addListener(Listener listener){
@@ -141,7 +142,7 @@ public class ChatMesh{
     }
 
     public boolean onVpn(){
-        return !localIp.isEmpty();
+        return usingVpn;
     }
 
     public String peerSummary(){
@@ -232,30 +233,39 @@ public class ChatMesh{
 
     private void discover(){
         try{
-            String ip = findVpnIp();
-            if(ip == null){
-                if(!localIp.isEmpty()){
+            DiscoveryAddress address = findDiscoveryAddress();
+            if(address == null){
+                if(!localIp.isEmpty() || usingVpn){
                     localIp = "";
+                    usingVpn = false;
                     closeAll();
                     statusChanged();
                 }
                 return;
             }
-            localIp = ip;
+            if(!address.ip.equals(localIp) || address.vpn != usingVpn){
+                closeAll();
+            }
+            localIp = address.ip;
+            usingVpn = address.vpn;
 
-            int self = lastOctet(ip);
-            if(self > 0){
-                String base = ip.substring(0, ip.lastIndexOf('.') + 1);
-                List<Future<Probe>> futures = new ArrayList<>();
-                for(int i = 1; i < 255; i++){
-                    if(i == self) continue;
-                    String target = base + i;
-                    futures.add(scanPool.submit(() -> probe(target)));
-                }
-                for(Future<Probe> f : futures){
-                    Probe p = f.get();
-                    if(p != null) adopt(p);
-                }
+            int prefix = address.prefix <= 0 || address.prefix > 32 ? 24 : address.prefix;
+            // Limit broad subnets to a /23 scan window to avoid probing thousands of hosts.
+            prefix = Math.max(prefix, 23);
+            long ip = ipv4ToLong(address.ip);
+            long mask = (0xffffffffL << (32 - prefix)) & 0xffffffffL;
+            long network = ip & mask;
+            long broadcast = network | (~mask & 0xffffffffL);
+
+            List<Future<Probe>> futures = new ArrayList<>();
+            for(long host = network + 1; host < broadcast; host++){
+                if(host == ip) continue;
+                String target = longToIpv4(host);
+                futures.add(scanPool.submit(() -> probe(target)));
+            }
+            for(Future<Probe> f : futures){
+                Probe p = f.get();
+                if(p != null) adopt(p);
             }
             statusChanged();
         }catch(Exception ignored){
@@ -602,14 +612,6 @@ public class ChatMesh{
         return UUID.randomUUID().toString().substring(0, 8);
     }
 
-    private static int lastOctet(String ip){
-        try{
-            return Integer.parseInt(ip.substring(ip.lastIndexOf('.') + 1));
-        }catch(Exception e){
-            return -1;
-        }
-    }
-
     private static void closeQuietly(Socket s){
         try{
             s.close();
@@ -617,32 +619,79 @@ public class ChatMesh{
         }
     }
 
-    /** Finds the IPv4 address of a WireGuard/tun interface, falling back to any 10.x address. */
-    private static String findVpnIp(){
+    private static class DiscoveryAddress{
+        final String ip;
+        final int prefix;
+        final boolean vpn;
+
+        DiscoveryAddress(String ip, int prefix, boolean vpn){
+            this.ip = ip;
+            this.prefix = prefix;
+            this.vpn = vpn;
+        }
+    }
+
+    /** Prefer a VPN interface; otherwise discover over a private local network interface. */
+    private static DiscoveryAddress findDiscoveryAddress(){
         try{
             Enumeration<NetworkInterface> ifs = NetworkInterface.getNetworkInterfaces();
-            String fallback = null;
+            DiscoveryAddress localFallback = null;
+            DiscoveryAddress physicalFallback = null;
             while(ifs.hasMoreElements()){
                 NetworkInterface nif = ifs.nextElement();
                 if(!nif.isUp() || nif.isLoopback()) continue;
                 boolean vpn = isVpnNamed(nif);
-                for(InetAddress a : Collections.list(nif.getInetAddresses())){
+                for(InterfaceAddress iface : nif.getInterfaceAddresses()){
+                    InetAddress a = iface.getAddress();
                     if(!(a instanceof Inet4Address) || a.isLoopbackAddress()) continue;
                     String s = a.getHostAddress();
-                    if(vpn && s.startsWith("10.")) return s;
-                    if(fallback == null && vpn) fallback = s;
-                    if(fallback == null && s.startsWith("10.")) fallback = s;
+                    if(vpn) return new DiscoveryAddress(s, iface.getNetworkPrefixLength(), true);
+                    if(isPrivateIpv4((Inet4Address)a)){
+                        DiscoveryAddress candidate = new DiscoveryAddress(s, iface.getNetworkPrefixLength(), false);
+                        if(!nif.isVirtual() && !isVirtualInterfaceName(nif)){
+                            if(physicalFallback == null) physicalFallback = candidate;
+                        }else if(localFallback == null){
+                            localFallback = candidate;
+                        }
+                    }
                 }
             }
-            return fallback;
+            return physicalFallback == null ? localFallback : physicalFallback;
         }catch(Exception e){
             return null;
         }
     }
 
+    private static boolean isPrivateIpv4(Inet4Address address){
+        byte[] b = address.getAddress();
+        int first = b[0] & 0xff, second = b[1] & 0xff;
+        return first == 10 || (first == 172 && second >= 16 && second <= 31) ||
+            (first == 192 && second == 168);
+    }
+
+    private static long ipv4ToLong(String ip){
+        String[] parts = ip.split("\\.");
+        return (Long.parseLong(parts[0]) << 24) | (Long.parseLong(parts[1]) << 16) |
+            (Long.parseLong(parts[2]) << 8) | Long.parseLong(parts[3]);
+    }
+
+    private static String longToIpv4(long ip){
+        return ((ip >>> 24) & 0xff) + "." + ((ip >>> 16) & 0xff) + "." +
+            ((ip >>> 8) & 0xff) + "." + (ip & 0xff);
+    }
+
     private static boolean isVpnNamed(NetworkInterface nif){
         String name = nif.getName() == null ? "" : nif.getName().toLowerCase();
         String display = nif.getDisplayName() == null ? "" : nif.getDisplayName().toLowerCase();
-        return name.startsWith("wg") || name.startsWith("tun") || display.contains("wireguard") || display.startsWith("tun");
+        return name.startsWith("wg") || name.startsWith("tun") || name.startsWith("tailscale") ||
+            name.startsWith("utun") || name.startsWith("tap") || name.startsWith("ppp") ||
+            name.contains("vpn") || display.contains("wireguard") || display.contains("tailscale") ||
+            display.startsWith("tun");
+    }
+
+    private static boolean isVirtualInterfaceName(NetworkInterface nif){
+        String name = nif.getName() == null ? "" : nif.getName().toLowerCase();
+        return name.startsWith("docker") || name.startsWith("br-") || name.startsWith("virbr") ||
+            name.startsWith("veth") || name.startsWith("cni") || name.startsWith("podman");
     }
 }

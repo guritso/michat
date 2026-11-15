@@ -274,11 +274,12 @@ public class ChatWindow extends BaseDialog implements ChatMesh.Listener{
     private void rebuildStatus(){
         statusRow.clear();
         statusRow.add("[#a2a2a2]v" + ChatMesh.VERSION + " \u00b7 ").left();
-        if(!mesh.onVpn()){
-            statusRow.add("[#e55454]\u25cf[] [#a2a2a2]no VPN detected").left();
+        if(mesh.localIp().isEmpty()){
+            statusRow.add("[#e55454]\u25cf[] [#a2a2a2]no network detected").left();
         }else{
             String peers = mesh.peerSummary();
-            statusRow.add("[#54d860]\u25cf[] [#a2a2a2]" + mesh.localIp() +
+            String mode = mesh.onVpn() ? "VPN" : "LAN";
+            statusRow.add("[#54d860]\u25cf[] [#a2a2a2]" + mode + " · " + mesh.localIp() +
                 (peers.isEmpty() ? " \u00b7 searching" : " \u00b7 " + peers)).left();
         }
     }

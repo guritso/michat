@@ -2,8 +2,8 @@
   "name": "michat",
   "displayName": "MiChat",
   "author": "guritso",
-  "description": "Chat with friends over your VPN without joining or hosting the same Mindustry server. MiChat connects separate single-player and campaign sessions, shares schematics, and also works alongside the native chat when you host or join a server.",
-  "version": "1.7.3",
+  "description": "Peer-to-peer chat over WireGuard, Tailscale, or your local LAN. Chat across separate single-player and campaign sessions without hosting the same server, share schematics, and use native chat alongside MiChat when hosting or joining a server.",
+  "version": "1.8.0",
   "minGameVersion": 160,
   "main": "michat.MiChat"
 }
