@@ -53,9 +53,9 @@ public class SchemDialog extends SchematicsDialog{
                     boolean ok = mesh.sendSchematic(name == null || name.isEmpty() ? "schema" : name,
                         Vars.schematics.writeBase64(s));
                     if(ok){
-                        Vars.ui.showInfoFade("schematic sent");
+                        Vars.ui.showInfo("schematic sent");
                     }else{
-                        Vars.ui.showInfoFade("schematic failed to send");
+                        Vars.ui.showInfo("schematic failed to send");
                     }
                 }).marginLeft(12f);
             });

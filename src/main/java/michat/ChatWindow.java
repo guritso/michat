@@ -183,7 +183,8 @@ public class ChatWindow implements ChatMesh.Listener{
                 Label label = new Label("(" + who(m.name) + "): [white]schematic '" + esc(m.text) + "'");
                 label.setWrap(true);
                 list.add(label).left().growX().width(winWidth - 44f - 88f).pad(1f, 6f, 1f, 6f);
-                list.button("Import", () -> importSchematic(m.schem)).size(80f, 30f).pad(1f, 2f, 1f, 6f);
+                list.button(Icon.download, Styles.cleari, () -> importSchematic(m.schem))
+                    .size(40f).pad(1f, 2f, 1f, 6f).get().resizeImage(24f);
                 list.row();
             }else{
                 Label label = new Label(nativeFormat(m.name, m.text));
@@ -199,7 +200,7 @@ public class ChatWindow implements ChatMesh.Listener{
         try{
             Schematic s = Schematics.readBase64(code);
             Vars.schematics.add(s);
-            Vars.ui.showInfoFade("schematic imported");
+            Vars.ui.showInfo("schematic imported");
             ChatMesh.log("schematic imported from received code");
         }catch(Exception e){
             Vars.ui.showException(e);
