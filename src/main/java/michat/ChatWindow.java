@@ -131,9 +131,15 @@ public class ChatWindow implements ChatMesh.Listener{
                 // same arrival sound the native chat plays for received packets
                 Sounds.uiChat.play();
             }
-            // visible arrival notice; works in the menu where showInfoToast is hidden by the game
-            if(m.schem != null && !m.self){
-                Vars.ui.showInfoFade(esc(m.name) + " shared schematic '" + esc(m.text) + "'");
+            // The menu has no native chat feed, so briefly surface incoming messages there too.
+            if(inMenu && !m.self && Vars.ui != null){
+                if(m.schem != null){
+                    Vars.ui.showInfoFade(esc(m.name) + " shared schematic '" + esc(m.text) + "'");
+                }else if(m.system){
+                    Vars.ui.showInfoFade("[gray]" + who(m.name) + " " + esc(m.text));
+                }else{
+                    Vars.ui.showInfoFade(nativeFormat(m.name, esc(m.text)));
+                }
             }
             rebuildMessages();
         });
