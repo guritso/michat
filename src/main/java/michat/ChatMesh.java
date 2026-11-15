@@ -190,7 +190,7 @@ public class ChatMesh{
             out.println(HELLO + " " + myName());
             String line = in.readLine();
             if(line != null && line.startsWith(HELLO + " ")){
-                return new Probe(target, sanitize(line.substring(HELLO.length() + 1), 24), s, true);
+                return new Probe(target, sanitize(line.substring(HELLO.length() + 1), 64), s, true);
             }
             s.close();
         }catch(Exception ignored){
@@ -250,7 +250,7 @@ public class ChatMesh{
                 s.close();
                 return;
             }
-            String name = sanitize(line.substring(HELLO.length() + 1), 24);
+            String name = sanitize(line.substring(HELLO.length() + 1), 64);
             // reply with our own greeting so the probing side can complete its handshake
             PrintWriter out = new PrintWriter(new OutputStreamWriter(s.getOutputStream()), true);
             out.println(HELLO + " " + myName());
@@ -283,7 +283,7 @@ public class ChatMesh{
 
     private void handle(Peer peer, String line){
         if(line.startsWith(HELLO + " ")){
-            String n = sanitize(line.substring(HELLO.length() + 1), 24);
+            String n = sanitize(line.substring(HELLO.length() + 1), 64);
             if(!n.isEmpty() && !n.equals(peer.name)){
                 peer.name = n;
                 statusChanged();
@@ -294,7 +294,7 @@ public class ChatMesh{
             String[] parts = line.split("\\|", 5);
             if(parts.length < 5) return;
             String id = parts[1];
-            String name = sanitize(parts[3], 24);
+            String name = sanitize(parts[3], 64);
             String text = sanitize(parts[4], 300);
             int hop;
             try{
@@ -381,7 +381,8 @@ public class ChatMesh{
 
     static String myName(){
         if(Vars.player != null && Vars.player.name != null && !Vars.player.name.trim().isEmpty()){
-            return Vars.player.name.trim();
+            String colored = Vars.player.coloredName();
+            return colored == null || colored.isEmpty() ? Vars.player.name.trim() : colored;
         }
         return Core.settings.getString("name", "Player");
     }
