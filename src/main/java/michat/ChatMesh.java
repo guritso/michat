@@ -172,8 +172,9 @@ public class ChatMesh{
     }
 
     /** Sends a schematic to all peers. */
-    public void sendSchematic(String schemaName, String code){
-        if(code == null || code.length() > MAX_SCHEM || !code.startsWith("bXNjaAB")) return;
+    /** Sends a schematic to all peers. Returns false when the code was rejected. */
+    public boolean sendSchematic(String schemaName, String code){
+        if(code == null || code.length() > MAX_SCHEM || !code.startsWith("bXNjaAB")) return false;
         String cleanName = sanitize(schemaName, 60).replace("|", " ");
         if(cleanName.isEmpty()) cleanName = "schema";
         String name = myName();
@@ -184,6 +185,7 @@ public class ChatMesh{
         synchronized(lock){
             for(Peer p : peers) write(p, line);
         }
+        return true;
     }
 
     // discovery

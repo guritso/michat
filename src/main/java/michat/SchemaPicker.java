@@ -35,8 +35,8 @@ public class SchemaPicker extends BaseDialog{
                     row.add(shown).left().growX().pad(8f);
                     row.button(Icon.chat, Styles.clearNonei, () -> {
                         hide();
-                        mesh.sendSchematic(shown, Vars.schematics.writeBase64(s));
-                        Vars.ui.showInfoToast("schematic sent", 3f);
+                        boolean ok = mesh.sendSchematic(shown, Vars.schematics.writeBase64(s));
+                        Vars.ui.showInfoToast(ok ? "schematic sent" : "schematic failed to send", 3f);
                     }).size(48f).pad(4f);
                 }).growX().padBottom(4f).row();
             }

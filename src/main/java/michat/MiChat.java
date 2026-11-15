@@ -24,6 +24,9 @@ public class MiChat extends Mod{
             Vars.ui.menufrag.addButton("MiChat", Icon.chat, () -> window.toggle());
             // schematic export dialog gains a "send to chat" option (in-match access reads this field)
             Vars.ui.schematics = new SchemDialog(mesh);
+            // the desktop menu caches its button list with the old dialog reference;
+            // nulling the public cache makes the resize rebuild bind to the new dialog
+            Vars.ui.menufrag.desktopButtons = null;
             // the menu only rebuilds its button grid on resize events
             Events.fire(new ResizeEvent());
 

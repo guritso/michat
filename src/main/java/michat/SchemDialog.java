@@ -49,8 +49,13 @@ public class SchemDialog extends SchematicsDialog{
                 t.button("Send to chat", Icon.chat, style, () -> {
                     dialog.hide();
                     String name = s.name();
-                    mesh.sendSchematic(name == null || name.isEmpty() ? "schema" : name,
+                    boolean ok = mesh.sendSchematic(name == null || name.isEmpty() ? "schema" : name,
                         Vars.schematics.writeBase64(s));
+                    if(ok){
+                        Vars.ui.showInfoToast("schematic sent", 3f);
+                    }else{
+                        Vars.ui.showInfoToast("schematic failed to send", 3f);
+                    }
                 }).marginLeft(12f);
             });
         });
