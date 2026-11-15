@@ -20,7 +20,7 @@ import java.util.concurrent.*;
 public class ChatMesh{
     public static final int PORT = 26319;
     /** mod version, synced with mod.json; broadcast in the HELLO handshake */
-    public static final String VERSION = "1.7.0";
+    public static final String VERSION = "1.7.1";
 
     private static final String HELLO = "MICHAT1";
     private static final String PREFIX = "MICHAT_MSG|";

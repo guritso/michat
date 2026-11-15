@@ -17,12 +17,13 @@ import mindustry.gen.Player;
 import mindustry.gen.Sounds;
 import mindustry.graphics.Pal;
 import mindustry.ui.Styles;
+import mindustry.ui.dialogs.BaseDialog;
 
 
 import java.util.List;
 
-/** Minimal, native-looking chat window. */
-public class ChatWindow implements ChatMesh.Listener{
+/** Native Mindustry chat dialog for the menu and chat history/actions. */
+public class ChatWindow extends BaseDialog implements ChatMesh.Listener{
     private static final int REPLAY_LIMIT = 25;
 
     private final ChatMesh mesh;
@@ -31,60 +32,59 @@ public class ChatWindow implements ChatMesh.Listener{
     // last mesh message already handled by the native chat (delivered or intentionally skipped)
     private ChatMesh.Message lastDelivered;
 
-    private Table root;
     private Table list;
     private Table statusRow;
     private ScrollPane scroll;
     private TextField field;
     private float winWidth;
-    private boolean shown;
 
     public ChatWindow(ChatMesh mesh, MatchChatFragment matchChat){
+        super("MiChat");
         this.mesh = mesh;
         this.matchChat = matchChat;
+        addCloseButton();
         mesh.addListener(this);
         build();
+        shown(() -> {
+            rebuildStatus();
+            rebuildMessages();
+        });
+        onResize(() -> {
+            build();
+            rebuildStatus();
+            rebuildMessages();
+        });
     }
 
     public boolean shown(){
-        return shown;
+        return isShown();
     }
 
     public void toggle(){
-        shown = !shown;
-        if(shown) Core.app.post(this::toBottom);
+        if(isShown()){
+            hide();
+        }else{
+            show();
+            Core.app.post(this::toBottom);
+        }
     }
 
     private void build(){
-        root = new Table();
-        root.setFillParent(true);
-        root.touchable = Touchable.childrenOnly;
-        // MiChat is only used from the menu; during matches the native chat takes over
-        root.visible(() -> shown && !Vars.state.isGame());
+        cont.clear();
+        float availableWidth = Core.graphics.getWidth() / Scl.scl(1.05f) - Scl.scl(28f);
+        winWidth = Math.max(260f, Math.min(900f, availableWidth));
+        float availableHeight = Core.graphics.getHeight() / Scl.scl(1.05f) - Scl.scl(220f);
+        float listHeight = Math.max(240f, Math.min(720f, availableHeight));
+        cont.defaults().width(winWidth).pad(4f);
 
-        Table box = new Table(Styles.black6);
-        box.margin(10f);
-
-        boolean mob = Core.app.isMobile();
-        float sceneW = Math.max(Core.scene.getWidth(), 300f);
-        float sceneH = Math.max(Core.scene.getHeight(), 400f);
-        float w = Math.min(mob ? 500f : 424f, sceneW - 24f);
-        winWidth = w;
-        float boxH = Math.min(mob ? 560f : 430f, sceneH - 24f);
-        float listH = Math.max(200f, Math.min(320f, boxH - 116f));
-        float closeSize = mob ? 64f : 40f;
-
-        Table head = new Table();
-        head.add("MiChat").color(Pal.accent).growX().left();
-        head.button(Icon.cancel, Styles.cleari, () -> toggle()).size(closeSize).get()
-            .resizeImage(closeSize * 0.6f);
-        box.add(head).growX().row();
+        statusRow = new Table();
+        cont.add(statusRow).growX().left().row();
 
         list = new Table();
-        list.margin(2f, 6f, 2f, 6f);
+        list.top().left().margin(6f);
         scroll = new ScrollPane(list, Styles.smallPane);
         scroll.setScrollingDisabled(true, false);
-        box.row().add(scroll).width(w - 20f).maxHeight(listH).row();
+        cont.add(scroll).growX().height(listHeight).row();
 
         Table input = new Table();
         field = new TextField("", Styles.defaultField);
@@ -93,23 +93,9 @@ public class ChatWindow implements ChatMesh.Listener{
         field.setTextFieldListener((tf, c) -> {
             if(c == '\r' || c == '\n') send();
         });
-        input.add(field).growX();
-        input.button("Send", this::send).padLeft(6f);
-        box.row().add(input).growX().padTop(8f).row();
-
-        statusRow = new Table();
-        box.row().add(statusRow).growX().left().padTop(4f);
-
-        root.add(box).width(w).maxHeight(boxH);
-        Core.scene.add(root);
-
-        rebuildStatus();
-        rebuildMessages();
-    }
-
-    private float width(){
-        float base = Core.app.isMobile() ? 500f : 424f;
-        return Math.min(base, Math.max(300f, Core.scene.getWidth()) - 24f);
+        input.add(field).growX().height(Core.app.isMobile() ? 64f : 42f);
+        input.button("Send", this::send).padLeft(6f).size(Core.app.isMobile() ? 112f : 84f, Core.app.isMobile() ? 64f : 42f);
+        cont.add(input).growX().padTop(6f).row();
     }
 
     private void send(){
@@ -119,7 +105,7 @@ public class ChatWindow implements ChatMesh.Listener{
     }
 
     private void toBottom(){
-        Core.app.post(() -> scroll.setScrollY(Float.MAX_VALUE));
+        if(scroll != null) Core.app.post(() -> scroll.setScrollY(Float.MAX_VALUE));
     }
 
     @Override
@@ -155,6 +141,7 @@ public class ChatWindow implements ChatMesh.Listener{
     public void onMatchLoaded(){
         Core.app.post(() -> {
             if(!Vars.state.isGame() || Vars.ui == null) return;
+            if(isShown()) hide();
             // the game wipes pending chat on world load; do the same in the mod chat
             if(matchChat != null) matchChat.clearMessages();
             List<ChatMesh.Message> h = mesh.history();
