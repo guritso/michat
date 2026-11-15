@@ -2,6 +2,8 @@ package michat;
 
 import arc.Core;
 import arc.Events;
+import arc.scene.Element;
+import arc.scene.event.ChangeListener;
 import mindustry.Vars;
 import mindustry.game.EventType.ClientChatEvent;
 import mindustry.game.EventType.ClientLoadEvent;
@@ -27,6 +29,17 @@ public class MiChat extends Mod{
             // the desktop menu caches its button list with the old dialog reference;
             // nulling the public cache makes the resize rebuild bind to the new dialog
             Vars.ui.menufrag.desktopButtons = null;
+            // the mobile HUD build captured ui.schematics before mods loaded; rebind
+            // the named paste button so it opens the mod's dialog too
+            Element hudPaste = Core.scene.find("schematics");
+            if(hudPaste != null){
+                for(int i = hudPaste.getListeners().size - 1; i >= 0; i--){
+                    if(hudPaste.getListeners().get(i) instanceof ChangeListener){
+                        hudPaste.removeListener(hudPaste.getListeners().get(i));
+                    }
+                }
+                hudPaste.changed(() -> Vars.ui.schematics.show());
+            }
             // the menu only rebuilds its button grid on resize events
             Events.fire(new ResizeEvent());
 
