@@ -117,7 +117,7 @@ public class ChatWindow implements ChatMesh.Listener{
                 ChatMesh.Message m = h.get(h.size() - 1);
                 // skip own messages: the native chat already echoes them via the server
                 if(m.system){
-                    Vars.ui.chatfrag.addMessage("[gray]" + esc(m.name) + " " + esc(m.text));
+                    Vars.ui.chatfrag.addMessage("[gray]" + who(m.name) + " " + esc(m.text));
                 }else if(!m.self){
                     Vars.ui.chatfrag.addMessage(who(m.name) + ": " + esc(m.text));
                 }
@@ -135,7 +135,7 @@ public class ChatWindow implements ChatMesh.Listener{
         list.clear();
         for(ChatMesh.Message m : mesh.history()){
             if(m.system){
-                list.add("[#a2a2a2]" + esc(m.name) + " " + esc(m.text))
+                list.add("[#a2a2a2]" + who(m.name) + " " + esc(m.text))
                     .left().growX().pad(1f, 6f, 1f, 6f).row();
             }else{
                 Label label = new Label(who(m.name) + ": [white]" + esc(m.text));
