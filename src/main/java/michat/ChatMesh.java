@@ -18,7 +18,7 @@ import java.util.concurrent.*;
 public class ChatMesh{
     public static final int PORT = 26319;
     /** mod version, synced with mod.json; broadcast in the HELLO handshake */
-    public static final String VERSION = "1.8.1";
+    public static final String VERSION = "1.8.2";
 
     private static final String HELLO = "MICHAT1";
     private static final String PREFIX = "MICHAT_MSG|";
@@ -106,6 +106,7 @@ public class ChatMesh{
     private final Set<String> seen = new HashSet<>();
     private volatile String localIp = "";
     private volatile boolean usingVpn;
+    private volatile String manualPeerIp = "";
     private ExecutorService scanPool;
 
     public void addListener(Listener listener){
@@ -115,6 +116,7 @@ public class ChatMesh{
     }
 
     public void start(){
+        manualPeerIp = Core.settings.getString("michat-peer-ip", "");
         Thread accept = new Thread(this::acceptLoop, "michat-accept");
         accept.setDaemon(true);
         accept.start();
@@ -141,6 +143,36 @@ public class ChatMesh{
 
     public boolean onVpn(){
         return usingVpn;
+    }
+
+    public String manualPeerIp(){
+        return manualPeerIp;
+    }
+
+    public void setManualPeerIp(String ip){
+        String clean = ip == null ? "" : ip.trim();
+        if(!clean.isEmpty() && !validIpv4(clean)) throw new IllegalArgumentException("Invalid IPv4 address");
+        String previous = manualPeerIp;
+        manualPeerIp = clean;
+        Core.settings.put("michat-peer-ip", clean);
+        Core.settings.forceSave();
+        if(!previous.isEmpty() && !previous.equals(clean)){
+            synchronized(lock){
+                Peer old = findPeer(previous);
+                if(old != null){
+                    peers.remove(old);
+                    closeQuietly(old.socket);
+                }
+            }
+        }
+        if(!clean.isEmpty() && scanPool != null){
+            scanPool.submit(() -> {
+                Probe p = probe(clean);
+                if(p != null) adopt(p);
+                statusChanged();
+            });
+        }
+        statusChanged();
     }
 
     public String peerSummary(){
@@ -239,29 +271,31 @@ public class ChatMesh{
                     closeAll();
                     statusChanged();
                 }
-                return;
+            }else{
+                if(!address.ip.equals(localIp) || address.vpn != usingVpn){
+                    closeAll();
+                }
+                localIp = address.ip;
+                usingVpn = address.vpn;
             }
-            if(!address.ip.equals(localIp) || address.vpn != usingVpn){
-                closeAll();
-            }
-            localIp = address.ip;
-            usingVpn = address.vpn;
-
-            int prefix = address.prefix <= 0 || address.prefix > 32 ? 24 : address.prefix;
-            // Limit broad subnets to a /23 scan window to avoid probing thousands of hosts.
-            prefix = Math.max(prefix, 23);
-            long ip = ipv4ToLong(address.ip);
-            long mask = (0xffffffffL << (32 - prefix)) & 0xffffffffL;
-            long network = ip & mask;
-            long broadcast = network | (~mask & 0xffffffffL);
-
             Set<String> targets = new LinkedHashSet<>();
-            for(long host = network + 1; host < broadcast; host++){
-                if(host != ip) targets.add(longToIpv4(host));
+            if(address != null){
+                int prefix = address.prefix <= 0 || address.prefix > 32 ? 24 : address.prefix;
+                // Limit broad subnets to a /23 scan window to avoid probing thousands of hosts.
+                prefix = Math.max(prefix, 23);
+                long ip = ipv4ToLong(address.ip);
+                long mask = (0xffffffffL << (32 - prefix)) & 0xffffffffL;
+                long network = ip & mask;
+                long broadcast = network | (~mask & 0xffffffffL);
+                for(long host = network + 1; host < broadcast; host++){
+                    if(host != ip) targets.add(longToIpv4(host));
+                }
             }
             // Tailscale assigns addresses across 100.64.0.0/10, which is too large to scan.
             // Reuse active Mindustry connection endpoints as focused MiChat discovery targets.
-            if(address.vpn) targets.addAll(activeTailscalePeers());
+            if(address != null && address.vpn) targets.addAll(activeTailscalePeers());
+            String savedPeer = manualPeerIp;
+            if(!savedPeer.isEmpty() && !savedPeer.equals(localIp)) targets.add(savedPeer);
 
             List<Future<Probe>> futures = new ArrayList<>();
             for(String target : targets){

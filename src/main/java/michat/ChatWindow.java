@@ -43,6 +43,8 @@ public class ChatWindow extends BaseDialog implements ChatMesh.Listener{
         this.mesh = mesh;
         this.matchChat = matchChat;
         addCloseButton();
+        titleTable.button(Icon.link, Styles.cleari, this::showPeerDialog)
+            .size(48f).get().resizeImage(24f);
         mesh.addListener(this);
         build();
         shown(() -> {
@@ -103,6 +105,31 @@ public class ChatWindow extends BaseDialog implements ChatMesh.Listener{
         String text = field.getText();
         field.setText("");
         mesh.send(text);
+    }
+
+    private void showPeerDialog(){
+        BaseDialog dialog = new BaseDialog("Connect by IP");
+        dialog.addCloseButton();
+        dialog.cont.add("Enter the peer's VPN or LAN IPv4 address.")
+            .left().wrap().width(Core.app.isMobile() ? 480f : 420f).pad(8f).row();
+
+        TextField address = new TextField(mesh.manualPeerIp(), Styles.defaultField);
+        address.setMessageText("e.g. 100.x.x.x");
+        address.setMaxLength(15);
+        dialog.cont.add(address).growX().height(Core.app.isMobile() ? 64f : 46f).pad(8f).row();
+        if(!mesh.manualPeerIp().isEmpty()) address.selectAll();
+
+        dialog.buttons.button("Save & connect", Icon.play, () -> {
+            try{
+                mesh.setManualPeerIp(address.getText());
+                dialog.hide();
+            }catch(IllegalArgumentException e){
+                if(Vars.ui != null) Vars.ui.showInfoToast("Enter a valid IPv4 address, or leave it empty to remove.", 3f);
+            }
+        }).size(Core.app.isMobile() ? 240f : 180f, Core.app.isMobile() ? 64f : 54f);
+        dialog.buttons.button("Cancel", Icon.cancel, dialog::hide)
+            .size(Core.app.isMobile() ? 180f : 140f, Core.app.isMobile() ? 64f : 54f);
+        dialog.show();
     }
 
     private void toBottom(){
