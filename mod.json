@@ -2,8 +2,8 @@
   "name": "michat",
   "displayName": "MiChat",
   "author": "guritso",
-  "description": "",
-  "version": "1.6.2",
+  "description": "Peer-to-peer chat for players on the same VPN network (WireGuard/Tailscale/any tunnel). Auto-detects peers, mirrors messages into the native in-match chat and shares schematics between devices. Works on desktop and Android; install via Mods > Import > GitHub.",
+  "version": "1.6.3",
   "minGameVersion": 160,
   "main": "michat.MiChat"
 }
