@@ -48,6 +48,7 @@ public class SchemDialog extends SchematicsDialog{
                 t.row();
                 t.button("Send to chat", Icon.chat, style, () -> {
                     dialog.hide();
+                    ChatMesh.log("Send to chat button clicked");
                     String name = s.name();
                     boolean ok = mesh.sendSchematic(name == null || name.isEmpty() ? "schema" : name,
                         Vars.schematics.writeBase64(s));

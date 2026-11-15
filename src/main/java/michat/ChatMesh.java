@@ -173,6 +173,9 @@ public class ChatMesh{
 
     /** Sends a schematic to all peers. Returns false when the code was rejected. */
     public boolean sendSchematic(String schemaName, String code){
+        log("send schematic '" + schemaName + "': code " +
+            (code == null ? "null" : code.length() + " chars, starts " +
+                (code.length() >= 7 ? code.substring(0, 7) : code)));
         if(code == null || code.length() > MAX_SCHEM || !code.startsWith("bXNjaAB")) return false;
         String cleanName = sanitize(schemaName, 60).replace("|", " ");
         if(cleanName.isEmpty()) cleanName = "schema";
@@ -181,9 +184,12 @@ public class ChatMesh{
         markSeen(id);
         postMessage(name, cleanName, false, true, code);
         String line = SCHEM + id + "|0|" + name + "|" + cleanName + "|" + code;
+        int count;
         synchronized(lock){
+            count = peers.size;
             for(Peer p : peers) write(p, line);
         }
+        log("schematic posted to history, written to " + count + " peer(s)");
         return true;
     }
 
@@ -261,6 +267,7 @@ public class ChatMesh{
                 Peer peer = new Peer(p.ip, p.name, wantOut, p.socket);
                 peers.add(peer);
                 readAsync(peer);
+                log("peer connected: " + p.ip + " (" + p.name + ")");
                 if(!replaced) postMessage(peer.name, "joined the chat", true, false);
             }catch(IOException e){
                 closeQuietly(p.socket);
@@ -351,6 +358,7 @@ public class ChatMesh{
             }
         }
         if(line.startsWith(SCHEM)){
+            log("received schematic line: " + line.length() + " chars total");
             String[] parts = line.split("\\|", 6);
             if(parts.length < 6) return;
             String id = parts[1];
@@ -366,6 +374,7 @@ public class ChatMesh{
             if(!markSeen(id)) return;
             if(name.isEmpty() || text.isEmpty()) return;
             if(code.length() > MAX_SCHEM || !code.startsWith("bXNjaAB")) return;
+            log("schematic accepted from " + name + ": '" + text + "', " + code.length() + " chars");
             postMessage(name, text, false, false, code);
             if(hop < HOP_LIMIT){
                 forward(peer, SCHEM + id + "|" + (hop + 1) + "|" + name + "|" + text + "|" + code);
@@ -416,6 +425,7 @@ public class ChatMesh{
                 return;
             }
         }
+        log("peer dropped: " + peer.ip + " (" + peer.name + ")");
         postMessage(peer.name, note, true, false);
         statusChanged();
     }
@@ -471,6 +481,10 @@ public class ChatMesh{
             return colored == null || colored.isEmpty() ? Vars.player.name.trim() : colored;
         }
         return Core.settings.getString("name", "Player");
+    }
+
+    static void log(String text){
+        arc.util.Log.info("michat: " + text);
     }
 
     static String sanitize(String text, int limit){

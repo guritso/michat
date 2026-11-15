@@ -24,7 +24,6 @@ public class ChatWindow implements ChatMesh.Listener{
     private static final int REPLAY_LIMIT = 25;
 
     private final ChatMesh mesh;
-    private final SchemaPicker picker;
     // last mesh message already handled by the native chat (delivered or intentionally skipped)
     private ChatMesh.Message lastDelivered;
 
@@ -39,7 +38,6 @@ public class ChatWindow implements ChatMesh.Listener{
     public ChatWindow(ChatMesh mesh){
         this.mesh = mesh;
         mesh.addListener(this);
-        this.picker = new SchemaPicker(mesh);
         build();
     }
 
@@ -73,8 +71,6 @@ public class ChatWindow implements ChatMesh.Listener{
 
         Table head = new Table();
         head.add("MiChat").color(Pal.accent).growX().left();
-        head.button(Icon.upload, Styles.cleari, () -> picker.show()).size(closeSize).get()
-            .resizeImage(closeSize * 0.6f);
         head.button(Icon.cancel, Styles.cleari, () -> toggle()).size(closeSize).get()
             .resizeImage(closeSize * 0.6f);
         box.add(head).growX().row();
@@ -124,6 +120,8 @@ public class ChatWindow implements ChatMesh.Listener{
     @Override
     public void onMessage(ChatMesh.Message m){
         Core.app.post(() -> {
+            if(m.schem != null) ChatMesh.log("window got schematic from " + m.name +
+                (m.self ? " (self)" : " (peer)"));
             deliver(m, false);
             // visible arrival notice; works in the menu where showInfoToast is hidden by the game
             if(m.schem != null && !m.self){
@@ -157,6 +155,7 @@ public class ChatWindow implements ChatMesh.Listener{
      */
     private void deliver(ChatMesh.Message m, boolean replay){
         if(Vars.ui == null || !Vars.state.isGame()) return; // outside matches the native chat is not used
+        if(m.schem != null && !replay) ChatMesh.log("deliver schematic to native chat (in match)");
         // everything up to here has been handled, even when intentionally skipped below
         lastDelivered = m;
         if(m.system){
@@ -201,8 +200,10 @@ public class ChatWindow implements ChatMesh.Listener{
             Schematic s = Schematics.readBase64(code);
             Vars.schematics.add(s);
             Vars.ui.showInfoFade("schematic imported");
+            ChatMesh.log("schematic imported from received code");
         }catch(Exception e){
             Vars.ui.showException(e);
+            ChatMesh.log("schematic import failed: " + e);
         }
     }
 
