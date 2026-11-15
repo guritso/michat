@@ -120,7 +120,7 @@ public class ChatWindow implements ChatMesh.Listener{
                         Vars.ui.chatfrag.addMessage("[gray]" + who(m.name) + " " + esc(m.text));
                     }
                 }else if(!m.self && !inSameMatch(m.name)){
-                    Vars.ui.chatfrag.addMessage("(" + who(m.name) + "): " + esc(m.text));
+                    Vars.ui.chatfrag.addMessage(nativeFormat(m.name, m.text));
                 }
             }
             rebuildMessages();
@@ -140,7 +140,7 @@ public class ChatWindow implements ChatMesh.Listener{
                 label.setWrap(true);
                 list.add(label).left().growX().width(winWidth - 44f).pad(1f, 6f, 1f, 6f).row();
             }else{
-                Label label = new Label("(" + who(m.name) + "): [white]" + esc(m.text));
+                Label label = new Label(nativeFormat(m.name, m.text));
                 label.setWrap(true);
                 list.add(label).left().growX().width(winWidth - 44f).pad(1f, 6f, 1f, 6f).row();
             }
@@ -152,6 +152,11 @@ public class ChatWindow implements ChatMesh.Listener{
     private static String who(String name){
         if(name.startsWith("[")) return name + "[]";
         return "[" + nameColor(name) + "]" + esc(name) + "[]";
+    }
+
+    /** Identical to the native server chat formatter: coral brackets and colon, colored name, white text. */
+    private static String nativeFormat(String name, String text){
+        return "[coral][[" + who(name) + "[coral]]:[white] " + text;
     }
 
     /** True when the sender is a player in the local match: the server already delivers their chat. */
