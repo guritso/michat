@@ -10,6 +10,7 @@ import arc.util.*;
 import mindustry.Vars;
 import mindustry.game.Schematic;
 import mindustry.game.Schematics;
+import mindustry.core.NetClient;
 import mindustry.gen.Groups;
 import mindustry.gen.Icon;
 import mindustry.gen.Player;
@@ -213,7 +214,13 @@ public class ChatWindow implements ChatMesh.Listener{
             if(m.system){
                 Label label = new Label("[#a2a2a2]" + who(m.name) + " " + esc(m.text));
                 label.setWrap(true);
-                list.add(label).left().growX().width(winWidth - 44f).pad(1f, 6f, 1f, 6f).row();
+                float actionWidth = m.joinIp != null && !m.self ? 48f : 0f;
+                list.add(label).left().growX().width(winWidth - 44f - actionWidth).pad(1f, 6f, 1f, 6f);
+                if(m.joinIp != null && !m.self){
+                    list.button(Icon.play, Styles.cleari, () -> joinLan(m.joinIp, m.joinPort))
+                        .size(40f).pad(1f, 2f, 1f, 6f).get().resizeImage(24f);
+                }
+                list.row();
             }else if(m.schem != null){
                 Label label = new Label("(" + who(m.name) + "): [white]schematic '" + esc(m.text) + "'");
                 label.setWrap(true);
@@ -241,6 +248,12 @@ public class ChatWindow implements ChatMesh.Listener{
             Vars.ui.showException(e);
             ChatMesh.log("schematic import failed: " + e);
         }
+    }
+
+    /** Uses the game's normal join flow so its connection errors and loading UI are preserved. */
+    private static void joinLan(String ip, int port){
+        ChatMesh.log("joining LAN host " + ip + ":" + port);
+        NetClient.connect(ip, port);
     }
 
     /** Names may carry the player's own native color markup. */

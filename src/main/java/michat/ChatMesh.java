@@ -20,12 +20,13 @@ import java.util.concurrent.*;
 public class ChatMesh{
     public static final int PORT = 26319;
     /** mod version, synced with mod.json; broadcast in the HELLO handshake */
-    public static final String VERSION = "1.6.5";
+    public static final String VERSION = "1.7.0";
 
     private static final String HELLO = "MICHAT1";
     private static final String PREFIX = "MICHAT_MSG|";
     private static final String NOTE = "MICHAT_NOTE|";
     private static final String SCHEM = "MICHAT_SCHEM|";
+    private static final String JOIN = "MICHAT_JOIN|";
     private static final int HOP_LIMIT = 4;
     private static final int MAX_HISTORY = 200;
     private static final int MAX_SEEN = 512;
@@ -77,17 +78,26 @@ public class ChatMesh{
         /** base64 schematic code when this message carries a schematic, null otherwise */
         public final String schem;
         public final boolean system, self;
+        /** VPN address and game port for a LAN invite, null when this is not an invite. */
+        public final String joinIp;
+        public final int joinPort;
 
         Message(String name, String text, boolean system, boolean self){
-            this(name, text, system, self, null);
+            this(name, text, system, self, null, null, 0);
         }
 
         Message(String name, String text, boolean system, boolean self, String schem){
+            this(name, text, system, self, schem, null, 0);
+        }
+
+        Message(String name, String text, boolean system, boolean self, String schem, String joinIp, int joinPort){
             this.name = name;
             this.text = text;
             this.schem = schem;
             this.system = system;
             this.self = self;
+            this.joinIp = joinIp;
+            this.joinPort = joinPort;
         }
     }
 
@@ -175,6 +185,23 @@ public class ChatMesh{
         // self = true so the sender does not mirror their own note back into the native chat
         postMessage(name, clean, true, true);
         String line = NOTE + id + "|0|" + name + "|" + clean;
+        synchronized(lock){
+            for(Peer p : peers) write(p, line);
+        }
+    }
+
+    /** Announces that this peer is hosting a LAN game and attaches a join action. */
+    public void announceLanJoin(String text, int port){
+        String ip = localIp;
+        if(ip.isEmpty() || !validIpv4(ip) || port < 1 || port > 65535) return;
+
+        String clean = sanitize(text, 200);
+        if(clean.isEmpty()) return;
+        String name = myName();
+        String id = randomId();
+        markSeen(id);
+        postMessage(name, clean, true, true, null, ip, port);
+        String line = JOIN + id + "|0|" + name + "|" + ip + "|" + port + "|" + clean;
         synchronized(lock){
             for(Peer p : peers) write(p, line);
         }
@@ -432,6 +459,27 @@ public class ChatMesh{
                 forward(peer, NOTE + id + "|" + (hop + 1) + "|" + name + "|" + text);
             }
         }
+        if(line.startsWith(JOIN)){
+            String[] parts = line.split("\\|", 7);
+            if(parts.length < 7) return;
+            String id = parts[1];
+            String name = sanitize(parts[3], 64);
+            String ip = parts[4];
+            String text = sanitize(parts[6], 200);
+            int hop, port;
+            try{
+                hop = Integer.parseInt(parts[2]);
+                port = Integer.parseInt(parts[5]);
+            }catch(Exception e){
+                return;
+            }
+            if(!markSeen(id) || name.isEmpty() || text.isEmpty() || !sameSubnet(ip, peer.ip) ||
+                port < 1 || port > 65535) return;
+            postMessage(name, text, true, false, null, ip, port);
+            if(hop < HOP_LIMIT){
+                forward(peer, JOIN + id + "|" + (hop + 1) + "|" + name + "|" + ip + "|" + port + "|" + text);
+            }
+        }
     }
 
     private void forward(Peer except, String line){
@@ -494,7 +542,11 @@ public class ChatMesh{
     }
 
     private void postMessage(String name, String text, boolean system, boolean self, String schem){
-        Message message = new Message(name, text, system, self, schem);
+        postMessage(name, text, system, self, schem, null, 0);
+    }
+
+    private void postMessage(String name, String text, boolean system, boolean self, String schem, String joinIp, int joinPort){
+        Message message = new Message(name, text, system, self, schem, joinIp, joinPort);
         synchronized(lock){
             history.add(message);
             while(history.size() > MAX_HISTORY) history.remove(0);
@@ -525,6 +577,25 @@ public class ChatMesh{
         text = text.replaceAll("[\\u0000-\\u001f]", " ").trim();
         if(text.length() > limit) text = text.substring(0, limit);
         return text;
+    }
+
+    private static boolean validIpv4(String ip){
+        String[] octets = ip.split("\\.", -1);
+        if(octets.length != 4) return false;
+        for(String octet : octets){
+            try{
+                int value = Integer.parseInt(octet);
+                if(value < 0 || value > 255 || !Integer.toString(value).equals(octet)) return false;
+            }catch(Exception e){
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean sameSubnet(String first, String second){
+        if(!validIpv4(first) || !validIpv4(second)) return false;
+        return first.substring(0, first.lastIndexOf('.')).equals(second.substring(0, second.lastIndexOf('.')));
     }
 
     private static String randomId(){

@@ -10,6 +10,7 @@ import arc.struct.Seq;
 import mindustry.Vars;
 import mindustry.game.EventType.ClientChatEvent;
 import mindustry.game.EventType.ClientLoadEvent;
+import mindustry.game.EventType.HostEvent;
 import mindustry.game.EventType.ResizeEvent;
 import mindustry.game.EventType.WorldLoadEvent;
 import mindustry.gen.Icon;
@@ -65,6 +66,14 @@ public class MiChat extends Mod{
                     mesh.announce(sb.toString());
                 }catch(Exception ignored){
                 }
+            }));
+
+            // A map announcement alone is not joinable. Publish a separate invite only
+            // after the game confirms that LAN hosting has started.
+            Events.on(HostEvent.class, ev -> Core.app.post(() -> {
+                if(mesh == null) return;
+                String mapName = Vars.state.map == null ? "a game" : "'" + Vars.state.map.name() + "'";
+                mesh.announceLanJoin("opened LAN for " + mapName, Core.settings.getInt("port", Vars.port));
             }));
         });
     }
