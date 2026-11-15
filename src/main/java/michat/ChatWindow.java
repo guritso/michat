@@ -13,6 +13,7 @@ import mindustry.game.Schematics;
 import mindustry.gen.Groups;
 import mindustry.gen.Icon;
 import mindustry.gen.Player;
+import mindustry.gen.Sounds;
 import mindustry.graphics.Pal;
 import mindustry.ui.Styles;
 
@@ -24,6 +25,8 @@ public class ChatWindow implements ChatMesh.Listener{
     private static final int REPLAY_LIMIT = 25;
 
     private final ChatMesh mesh;
+    // in-match chat for matches without a networked server (the native chat is unusable there)
+    private final MatchChatFragment matchChat;
     // last mesh message already handled by the native chat (delivered or intentionally skipped)
     private ChatMesh.Message lastDelivered;
 
@@ -35,8 +38,9 @@ public class ChatWindow implements ChatMesh.Listener{
     private float winWidth;
     private boolean shown;
 
-    public ChatWindow(ChatMesh mesh){
+    public ChatWindow(ChatMesh mesh, MatchChatFragment matchChat){
         this.mesh = mesh;
+        this.matchChat = matchChat;
         mesh.addListener(this);
         build();
     }
@@ -122,7 +126,11 @@ public class ChatWindow implements ChatMesh.Listener{
         Core.app.post(() -> {
             if(m.schem != null) ChatMesh.log("window got schematic from " + m.name +
                 (m.self ? " (self)" : " (peer)"));
-            deliver(m, false);
+            boolean inMenu = Vars.ui == null || !Vars.state.isGame();
+            if(deliver(m, false) || inMenu){
+                // same arrival sound the native chat plays for received packets
+                Sounds.uiChat.play();
+            }
             // visible arrival notice; works in the menu where showInfoToast is hidden by the game
             if(m.schem != null && !m.self){
                 Vars.ui.showInfoFade(esc(m.name) + " shared schematic '" + esc(m.text) + "'");
@@ -136,10 +144,12 @@ public class ChatWindow implements ChatMesh.Listener{
         Core.app.post(this::rebuildStatus);
     }
 
-    /** Replays mesh history not yet handled into the native chat when a match starts. */
+    /** Replays mesh history not yet handled into the chat that is active when a match starts. */
     public void onMatchLoaded(){
         Core.app.post(() -> {
             if(!Vars.state.isGame() || Vars.ui == null) return;
+            // the game wipes pending chat on world load; do the same in the mod chat
+            if(matchChat != null) matchChat.clearMessages();
             List<ChatMesh.Message> h = mesh.history();
             int idx = lastDelivered == null ? -1 : h.indexOf(lastDelivered);
             int start = idx >= 0 ? Math.min(idx + 1, h.size()) : Math.max(0, h.size() - REPLAY_LIMIT);
@@ -150,26 +160,45 @@ public class ChatWindow implements ChatMesh.Listener{
     }
 
     /**
-     * Sends one mesh message to the native chat when appropriate, tracking what was handled.
-     * Messages that arrive while a match is loading are left for the match-load replay.
+     * Sends one mesh message to the chat active in the current state, tracking what was handled.
+     * Without a networked server the native chat is hidden and drops messages, so the mod's
+     * own match chat takes over there. Messages that arrive while a match is loading are left
+     * for the match-load replay.
+     * @return whether the message was displayed in any chat.
      */
-    private void deliver(ChatMesh.Message m, boolean replay){
-        if(Vars.ui == null || !Vars.state.isGame()) return; // outside matches the native chat is not used
-        if(m.schem != null && !replay) ChatMesh.log("deliver schematic to native chat (in match)");
+    private boolean deliver(ChatMesh.Message m, boolean replay){
+        if(Vars.ui == null || !Vars.state.isGame()) return false; // outside matches no chat is used
+        if(m.schem != null && !replay){
+            ChatMesh.log("deliver schematic in match (" + (Vars.net.active() ? "native" : "michat") + " chat)");
+        }
         // everything up to here has been handled, even when intentionally skipped below
         lastDelivered = m;
+        // without a server there is no echo of our own messages: show them directly
+        boolean own = !Vars.net.active() && matchChat != null;
         if(m.system){
-            if(!m.self){
-                Vars.ui.chatfrag.addMessage("[gray]" + who(m.name) + " " + esc(m.text));
-            }
+            if(!m.self) return route("[gray]" + who(m.name) + " " + esc(m.text), own);
+            return false;
         }else if(m.schem != null){
             // schematics only travel via the mesh, so the same-match and own-message
             // dedup used for server-echoed chat does not apply to them
-            Vars.ui.chatfrag.addMessage("[gray]" + who(m.name) + " shared schematic '" + esc(m.text) + "'");
-        }else if(!m.self && !(!replay && inSameMatch(m.name))){
+            return route("[gray]" + who(m.name) + " shared schematic '" + esc(m.text) + "'", own);
+        }else if(m.self){
+            return own && route(nativeFormat(m.name, m.text), true);
+        }else if(!(!replay && inSameMatch(m.name))){
             // in matches the server already echoes same-match players
-            Vars.ui.chatfrag.addMessage(nativeFormat(m.name, m.text));
+            return route(nativeFormat(m.name, m.text), own);
         }
+        return false;
+    }
+
+    /** Displays one chat line in the mod chat (no server) or in the native chat, if it works. */
+    private boolean route(String text, boolean useModChat){
+        if(useModChat && matchChat != null){
+            matchChat.addMessage(text);
+        }else{
+            Vars.ui.chatfrag.addMessage(text);
+        }
+        return true;
     }
 
     private void rebuildMessages(){

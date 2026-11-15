@@ -3,7 +3,7 @@
   "displayName": "MiChat",
   "author": "guritso",
   "description": "",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "minGameVersion": 160,
   "main": "michat.MiChat"
 }

@@ -4,6 +4,9 @@ import arc.Core;
 import arc.Events;
 import arc.scene.Element;
 import arc.scene.event.ChangeListener;
+import arc.scene.event.EventListener;
+import arc.scene.ui.ImageButton;
+import arc.struct.Seq;
 import mindustry.Vars;
 import mindustry.game.EventType.ClientChatEvent;
 import mindustry.game.EventType.ClientLoadEvent;
@@ -15,13 +18,15 @@ import mindustry.mod.Mod;
 public class MiChat extends Mod{
     private ChatMesh mesh;
     private ChatWindow window;
+    private MatchChatFragment matchChat;
 
     @Override
     public void init(){
         Events.on(ClientLoadEvent.class, e -> {
             mesh = new ChatMesh();
             mesh.start();
-            window = new ChatWindow(mesh);
+            matchChat = new MatchChatFragment(mesh);
+            window = new ChatWindow(mesh, matchChat);
 
             Vars.ui.menufrag.addButton("MiChat", Icon.chat, () -> window.toggle());
             // schematic export dialog gains a "send to chat" option (in-match access reads this field)
@@ -40,6 +45,10 @@ public class MiChat extends Mod{
                 }
                 hudPaste.changed(() -> Vars.ui.schematics.show());
             }
+            // in matches without a server the native chat is hidden and drops messages;
+            // rebind the named HUD chat button (which would open the database there) to the
+            // mod's match chat, keeping the native action whenever a server exists
+            rebindHudChatButton();
             // the menu only rebuilds its button grid on resize events
             Events.fire(new ResizeEvent());
 
@@ -68,6 +77,50 @@ public class MiChat extends Mod{
                 }catch(Exception ignored){
                 }
             }));
+        });
+    }
+
+    /**
+     * The mobile HUD has one button that toggles the native chat when networked, and opens
+     * the research/database dialogs otherwise. Take it over only in matches without a server,
+     * where the native chat cannot be seen; call the original behavior in every other state.
+     * Replaces the game's icon updater (Element stores a single one) with merged logic.
+     */
+    private void rebindHudChatButton(){
+        Element hudChat = Core.scene.find("chat");
+        if(hudChat == null) return;
+
+        Seq<EventListener> originals = new Seq<>();
+        for(EventListener l : hudChat.getListeners()){
+            if(l instanceof ChangeListener) originals.add(l);
+        }
+        for(int i = hudChat.getListeners().size - 1; i >= 0; i--){
+            if(hudChat.getListeners().get(i) instanceof ChangeListener){
+                hudChat.removeListener(hudChat.getListeners().get(i));
+            }
+        }
+
+        hudChat.changed(() -> {
+            if(matchChat != null && !Vars.net.active() && Vars.state.isGame()){
+                matchChat.toggle();
+            }else{
+                ChangeListener.ChangeEvent ev = new ChangeListener.ChangeEvent();
+                for(EventListener l : originals) l.handle(ev);
+            }
+        });
+
+        hudChat.update(() -> {
+            if(hudChat instanceof ImageButton){
+                ImageButton b = (ImageButton)hudChat;
+                if(Vars.state.isGame() || Vars.net.active()){
+                    // chat (ours in matches without a server, native when networked)
+                    ((ImageButton.ImageButtonStyle)b.getStyle()).imageUp = Icon.chat;
+                }else if(Vars.state.isCampaign()){
+                    ((ImageButton.ImageButtonStyle)b.getStyle()).imageUp = Icon.tree;
+                }else{
+                    ((ImageButton.ImageButtonStyle)b.getStyle()).imageUp = Icon.book;
+                }
+            }
         });
     }
 }
