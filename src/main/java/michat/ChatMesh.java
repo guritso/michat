@@ -18,7 +18,7 @@ import java.util.concurrent.*;
 public class ChatMesh{
     public static final int PORT = 26319;
     /** mod version, synced with mod.json; broadcast in the HELLO handshake */
-    public static final String VERSION = "1.8.8";
+    public static final String VERSION = "1.8.9";
 
     private static final String HELLO = "MICHAT1";
     private static final String PREFIX = "MICHAT_MSG|";
@@ -109,6 +109,7 @@ public class ChatMesh{
     private volatile String manualPeerIp = "";
     /** peer IPs worth re-probing every discovery cycle, persisted across restarts */
     private final Seq<String> stickyPeers = new Seq<>();
+    private String lastDiscoverSummary = "";
     private ExecutorService scanPool;
 
     public void addListener(Listener listener){
@@ -314,10 +315,16 @@ public class ChatMesh{
 
             Set<String> sweep = new LinkedHashSet<>();
             if(address != null){
-                int prefix = address.prefix <= 0 || address.prefix > 32 ? 24 : address.prefix;
-                // Limit broad subnets to a /23 scan window to avoid probing thousands of hosts.
-                prefix = Math.max(prefix, 23);
                 long ip = ipv4ToLong(address.ip);
+                // Always scan the full /24 around our address, matching the original discovery.
+                // Some tunnels report tiny prefixes (/25../32), which would shrink the sweep to nothing.
+                long base24 = ip & 0xffffff00L;
+                for(long host = base24 + 1; host < base24 + 255; host++){
+                    if(host != ip) sweep.add(longToIpv4(host));
+                }
+                // Also cover the reported subnet, capped at /23 to avoid probing thousands of hosts.
+                int prefix = address.prefix <= 0 || address.prefix > 32 ? 24 : address.prefix;
+                prefix = Math.max(prefix, 23);
                 long mask = (0xffffffffL << (32 - prefix)) & 0xffffffffL;
                 long network = ip & mask;
                 long broadcast = network | (~mask & 0xffffffffL);
@@ -334,9 +341,21 @@ public class ChatMesh{
             for(String target : sweep){
                 futures.add(scanPool.submit(() -> probe(target, 300, 600)));
             }
+            int found = 0;
             for(Future<Probe> f : futures){
                 Probe p = f.get();
-                if(p != null) adopt(p);
+                if(p != null){
+                    found++;
+                    adopt(p);
+                }
+            }
+            // one-line diagnostic, logged only when something changes
+            String summary = "addr=" + (address == null ? "none" :
+                address.ip + "/" + address.prefix + (address.vpn ? " vpn" : " lan")) +
+                " targeted=" + targeted.size() + " sweep=" + sweep.size() + " found=" + found;
+            if(!summary.equals(lastDiscoverSummary)){
+                lastDiscoverSummary = summary;
+                log("discover " + summary);
             }
             statusChanged();
         }catch(Exception ignored){
@@ -718,16 +737,32 @@ public class ChatMesh{
                 NetworkInterface nif = ifs.nextElement();
                 if(!nif.isUp() || nif.isLoopback()) continue;
                 boolean vpn = isVpnNamed(nif);
+                // Some tunnel interfaces expose no InterfaceAddress data, so fall back to raw addresses.
+                List<Inet4Address> addrs = new ArrayList<>();
+                List<Integer> prefixes = new ArrayList<>();
                 for(InterfaceAddress iface : nif.getInterfaceAddresses()){
                     InetAddress a = iface.getAddress();
                     if(!(a instanceof Inet4Address) || a.isLoopbackAddress()) continue;
+                    addrs.add((Inet4Address)a);
+                    prefixes.add((int)iface.getNetworkPrefixLength());
+                }
+                if(addrs.isEmpty()){
+                    for(InetAddress a : Collections.list(nif.getInetAddresses())){
+                        if(!(a instanceof Inet4Address) || a.isLoopbackAddress()) continue;
+                        addrs.add((Inet4Address)a);
+                        prefixes.add(24);
+                    }
+                }
+                for(int i = 0; i < addrs.size(); i++){
+                    Inet4Address a = addrs.get(i);
                     String s = a.getHostAddress();
-                    if(vpn) return new DiscoveryAddress(s, iface.getNetworkPrefixLength(), true);
-                    if(isPrivateIpv4((Inet4Address)a)){
-                        DiscoveryAddress candidate = new DiscoveryAddress(s, iface.getNetworkPrefixLength(), false);
-                        if(isTenAddress((Inet4Address)a) && tenFallback == null){
+                    int plen = prefixes.get(i);
+                    if(vpn) return new DiscoveryAddress(s, plen, true);
+                    if(isPrivateIpv4(a)){
+                        DiscoveryAddress candidate = new DiscoveryAddress(s, plen, false);
+                        if(isTenAddress(a) && tenFallback == null){
                             // Preserve detection for WireGuard setups whose OS hides tunnel names.
-                            tenFallback = new DiscoveryAddress(s, iface.getNetworkPrefixLength(), true);
+                            tenFallback = new DiscoveryAddress(s, plen, true);
                         }
                         if(!nif.isVirtual() && !isVirtualInterfaceName(nif)){
                             if(physicalFallback == null) physicalFallback = candidate;
